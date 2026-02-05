@@ -1,25 +1,46 @@
-# Rust / Cargo
-**/target/
-Cargo.lock
+# --- OpenSpore Substrate Gitignore ---
 
-# Environment Variables
+# Build Artifacts
+**/target/
+**/dist/
+**/build/
+**/bin/
+**/obj/
+
+# Dependencies
+**/node_modules/
+**/vendor/
+
+# Rust Specific (Beyond target)
+Cargo.lock
+**/*.rs.bk
+
+# Logs and SQLite
+*.log
+openspore.log
+*.db
+*.sqlite
+*.sqlite3
+
+# Data & Private Context
+workspace/
+.openspore_data/
+storage/
+
+# Secrets (CRITICAL)
 .env
 .env.*
 !.env.example
+*_key
+*token*
 
 # Editor / IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
 .DS_Store
-Thumbs.db
 
-# Logs
-*.log
-openspore.log
-
-# Workspace / Data
-workspace/
+# Temporary files
+tmp/
+temp/
