@@ -35,6 +35,8 @@ enum Commands {
     Auto,
     /// View recent context logs
     Logs,
+    /// List active sub-spores (swarm activity)
+    Swarm,
     /// One-shot think for swarm/spores
     Think {
         /// The prompt for the AI
@@ -56,10 +58,14 @@ async fn main() {
     let app_dir = get_app_dir();
     let log_file = format!("{}/openspore.log", app_dir);
 
-    // Initialize logging to file
-    let file = std::fs::File::create(&log_file).unwrap_or_else(|_| {
-        std::fs::File::open("/dev/null").unwrap()
-    });
+    // Initialize logging to file (append mode)
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_file)
+        .unwrap_or_else(|_| {
+            std::fs::File::open("/dev/null").unwrap()
+        });
 
     let (non_blocking, _guard) = tracing_appender::non_blocking(file);
 
@@ -67,11 +73,13 @@ async fn main() {
         // TUI mode: Only log to file, keep stdout clean for REPL
         tracing_subscriber::fmt()
             .with_writer(non_blocking)
+            .with_ansi(false)
             .init();
     } else {
         // CLI mode: Log to stdout for feedback
         tracing_subscriber::fmt()
             .with_writer(std::io::stdout)
+            .with_ansi(true)
             .init();
     }
 
@@ -170,6 +178,24 @@ async fn main() {
                 println!("❌ No crontab.json found");
             }
         }
+        Some(Commands::Swarm) => {
+            println!("🐝 [Swarm Status]: Scanning for active sub-spores...");
+            let swarm = openspore_swarm::SwarmManager::new();
+
+            match swarm.discovery().await {
+                Ok(lines) => {
+                    if lines.is_empty() {
+                        println!("📭 No active sub-spores found.");
+                    } else {
+                        println!("✅ Found {} active sub-spores:", lines.len());
+                        for line in lines {
+                            println!("  - {}", line);
+                        }
+                    }
+                }
+                Err(e) => println!("❌ Error: {}", e),
+            }
+        }
         Some(Commands::Auto) => {
             println!("🧠 [Anticipation Engine]: Analyzing patterns...");
             match AppConfig::load() {
@@ -199,9 +225,11 @@ async fn main() {
                 Ok(config) => {
                     let brain = Brain::new(config);
                     // Set IS_SPORE for this process
-                    std::env::set_var("IS_SPORE", "true");
-                    if let Some(r) = role {
-                        std::env::set_var("SPORE_ROLE", r);
+                    unsafe {
+                        std::env::set_var("IS_SPORE", "true");
+                        if let Some(r) = role {
+                            std::env::set_var("SPORE_ROLE", r);
+                        }
                     }
 
                     let response = brain.think(&prompt).await;

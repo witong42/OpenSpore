@@ -1,0 +1,20 @@
+[package]
+name = "openspore-autonomy"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = "0.4"
+anyhow = "1.0"
+tracing = "0.1"
+async-trait = "0.1"
+sysinfo = "0.30"
+
+openspore-core = { path = "../core" }
+openspore-brain = { path = "../brain" }
+openspore-memory = { path = "../memory" }
+openspore-doctor = { path = "../doctor" }
+openspore-telegram = { path = "../channels/telegram" }

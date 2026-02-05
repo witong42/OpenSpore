@@ -1,14 +1,16 @@
 [package]
 name = "openspore-tui"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-tokio = { version = "1.36", features = ["full", "sync"] }
+tokio = { version = "1.49", features = ["full", "sync"] }
 anyhow = "1.0"
+rustyline = "17.0"
 openspore-core = { path = "../core" }
 openspore-brain = { path = "../brain" }
 openspore-doctor = { path = "../doctor" }
 openspore-watchman = { path = "../watchman" }
 openspore-telegram = { path = "../channels/telegram" }
-
+openspore-autonomy = { path = "../autonomy" }
+openspore-memory = { path = "../memory" }

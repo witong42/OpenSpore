@@ -41,6 +41,7 @@ fn log(msg: &str, color: &str) {
 /// SporeDoctor - diagnostic and repair utility
 pub struct SporeDoctor {
     root: PathBuf,
+    #[allow(dead_code)]
     workspace: PathBuf,
     issues: Vec<Issue>,
 }

@@ -15,6 +15,15 @@ pub struct AppConfig {
     #[serde(alias = "AUTONOMY_ENABLED")]
     pub autonomy_enabled: bool,
 
+    #[serde(alias = "OPENROUTER_MODEL")]
+    pub model: Option<String>,
+
+    #[serde(alias = "OPENROUTER_MODEL_FAST")]
+    pub model_fast: Option<String>,
+
+    #[serde(alias = "OPENROUTER_MODEL_REASONING")]
+    pub model_reasoning: Option<String>,
+
     #[serde(skip)]
     pub project_root: std::path::PathBuf,
 }

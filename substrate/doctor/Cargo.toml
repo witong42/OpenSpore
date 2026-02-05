@@ -1,8 +1,8 @@
 [package]
 name = "openspore-doctor"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-tokio = { version = "1.36", features = ["full", "process"] }
+tokio = { version = "1.49", features = ["full", "process"] }
 anyhow = "1.0"

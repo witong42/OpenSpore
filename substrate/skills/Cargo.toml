@@ -1,16 +1,18 @@
 [package]
 name = "openspore-skills"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-tokio = { version = "1.36", features = ["full", "process"] }
+tokio = { version = "1.49", features = ["full", "process"] }
 async-trait = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.12", features = ["json"] }
 anyhow = "1.0"
 tracing = "0.1"
+diffy = "0.4"
 openspore-core = { path = "../core" }
 openspore-memory = { path = "../memory" }
+openspore-swarm = { path = "../swarm" }
 chrono = "0.4"

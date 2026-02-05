@@ -8,6 +8,7 @@ use openspore_brain::Brain;
 use tracing::info;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct TelegramChannel {
     token: String,
     allowed_users: Vec<String>,
@@ -32,6 +33,14 @@ impl TelegramChannel {
         })
     }
 
+    /// Send a message to the first allowed user (Heartbeat style)
+    pub async fn send_raw(&self, text: &str) -> anyhow::Result<()> {
+        let chat_id = self.allowed_users.first()
+            .ok_or_else(|| anyhow::anyhow!("No allowed users set"))?;
+
+        Self::send_stateless(text, Some(chat_id)).await
+    }
+
     /// Start the Telegram bot listener (Long Polling)
     pub async fn start(&self) -> anyhow::Result<()> {
         info!("📡 Telegram Gateway Starting...");
@@ -49,7 +58,7 @@ impl TelegramChannel {
             let allowed_users = allowed_users.clone();
             let brain = brain.clone();
             async move {
-                let user_id = msg.from().map(|u| u.id.to_string()).unwrap_or_default();
+                let user_id = msg.from.as_ref().map(|u| u.id.to_string()).unwrap_or_default();
 
                 // Security Check
                 if !allowed_users.is_empty() && !allowed_users.contains(&user_id) {
@@ -58,24 +67,28 @@ impl TelegramChannel {
                 }
 
                 if let Some(text) = msg.text() {
+                    let text = text.to_string(); // Own the text for the thread
                     info!("📩 [Telegram] Message from {}: {}", user_id, text);
 
                     // Show typing action
                     let _ = bot.send_chat_action(msg.chat.id, teloxide::types::ChatAction::Typing).await;
 
-                    // Think
-                    let response = brain.think(text).await;
+                    // Spawn a task so thinking doesn't block the next message
+                    tokio::spawn(async move {
+                        // Think
+                        let response = brain.think(&text).await;
 
-                    // Split and send
-                    for chunk in split_message(&response, 4000) {
-                        // Try sending with Markdown, fallback to plain text if it fails
-                        if let Err(_) = bot.send_message(msg.chat.id, chunk)
-                            .parse_mode(ParseMode::Markdown)
-                            .await
-                        {
-                            let _ = bot.send_message(msg.chat.id, chunk).await;
+                        // Split and send
+                        for chunk in split_message(&response, 4000) {
+                            // Try sending with MarkdownV2, fallback to plain text if it fails
+                            if let Err(_) = bot.send_message(msg.chat.id, chunk)
+                                .parse_mode(ParseMode::MarkdownV2)
+                                .await
+                            {
+                                let _ = bot.send_message(msg.chat.id, chunk).await;
+                            }
                         }
-                    }
+                    });
                 }
                 Ok(())
             }
@@ -103,7 +116,7 @@ impl TelegramChannel {
 
         for chunk in split_message(text, 4000) {
             if let Err(_) = bot.send_message(chat_id.clone(), chunk)
-                .parse_mode(ParseMode::Markdown)
+                .parse_mode(ParseMode::MarkdownV2)
                 .await
             {
                 let _ = bot.send_message(chat_id.clone(), chunk).await;

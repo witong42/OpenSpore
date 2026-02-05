@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tokio::process::Command;
-use tracing::{info, warn};
+use tracing::info;
 
 // Core skill modules (hardcoded in Rust)
 pub mod exec;
@@ -21,6 +21,10 @@ pub mod web_fetch;
 pub mod search;
 pub mod delegate;
 pub mod telegram_send;
+pub mod diff_patch;
+pub mod cron_manager;
+pub mod submit_skill;
+pub mod utils;
 
 /// Skill trait - all skills implement this interface
 #[async_trait]
@@ -122,6 +126,9 @@ impl SkillLoader {
             Box::new(search::SearchSkill),
             Box::new(delegate::DelegateSkill),
             Box::new(telegram_send::TelegramSendSkill),
+            Box::new(diff_patch::DiffPatchSkill),
+            Box::new(cron_manager::CronManagerSkill),
+            Box::new(submit_skill::SubmitSkill),
         ];
 
         for skill in core_skills {
@@ -211,7 +218,7 @@ impl SkillLoader {
     pub fn reload_plugins(&mut self) {
         // Remove existing plugins (keep core skills)
         let core_names: Vec<String> = ["exec", "read_file", "write_file", "edit_file", "list_dir", "purge",
-                                        "web_fetch", "search", "delegate", "telegram_send"]
+                                        "web_fetch", "search", "delegate", "telegram_send", "diff_patch", "cron_manager", "submit_skill"]
             .iter().map(|s| s.to_string()).collect();
 
         self.skills.retain(|name, _| core_names.contains(name));

@@ -2,6 +2,7 @@
 
 use super::Skill;
 use async_trait::async_trait;
+use std::path::Path;
 
 pub struct SearchSkill;
 
@@ -14,16 +15,39 @@ impl Skill for SearchSkill {
     }
 
     async fn execute(&self, args: &str) -> Result<String, String> {
-        let query = args.trim().trim_matches('"').trim_matches('\'');
+        let args = args.trim();
+
+        // Parse --path="..." if present
+        let mut query = args.to_string();
+        let mut search_path = None;
+
+        let path_marker = "--path=";
+        if let Some(idx) = args.find(path_marker) {
+            let start = idx + path_marker.len();
+            let remainder = &args[start..];
+            let end = remainder.find(' ').unwrap_or(remainder.len());
+            let raw_p = remainder[..end].trim().trim_matches('"').trim_matches('\'');
+            search_path = Some(openspore_core::path_utils::expand_tilde(raw_p));
+
+            // Remove path from query
+            query = format!("{} {}", &args[..idx], &remainder[end..]).trim().to_string();
+        }
+
+        let query = query.trim().trim_matches('"').trim_matches('\'');
 
         let config = openspore_core::config::AppConfig::load()
             .map_err(|e| format!("Config error: {}", e))?;
         let state = openspore_core::state::AppState::new(config);
         let memory = openspore_memory::MemorySystem::new(&state);
 
-        let results = memory.search(query, 5)
-            .await
-            .map_err(|e| format!("Search error: {}", e))?;
+        let results = if let Some(p) = search_path {
+            let path = Path::new(&p);
+            memory.search_in_path(query, path, 10).await
+                .map_err(|e| format!("Search error: {}", e))?
+        } else {
+            memory.search(query, 10).await
+                .map_err(|e| format!("Search error: {}", e))?
+        };
 
         if results.is_empty() {
             return Ok("No results found.".to_string());
@@ -31,7 +55,7 @@ impl Skill for SearchSkill {
 
         let mut output = format!("Found {} results:\n", results.len());
         for r in results {
-            output.push_str(&format!("- {} (score: {})\n", r.title, r.score));
+            output.push_str(&format!("- {} (score: {})\n  Path: {}\n", r.title, r.score, r.path.display()));
         }
         Ok(output)
     }

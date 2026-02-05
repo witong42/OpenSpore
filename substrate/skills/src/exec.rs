@@ -22,13 +22,27 @@ impl Skill for ExecSkill {
             .await
             .map_err(|e| e.to_string())?;
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+        let mut combined = stdout;
+        if !stderr.is_empty() {
+            if !combined.is_empty() {
+                combined.push_str("\n");
+            }
+            combined.push_str(&format!("[STDERR]\n{}", stderr));
+        }
 
         if output.status.success() {
-            Ok(stdout.to_string())
+            if combined.is_empty() {
+                Ok("✅ Command executed successfully (no output).".to_string())
+            } else {
+                Ok(combined)
+            }
         } else {
-            Err(format!("Command failed:\n{}\n{}", stdout, stderr))
+            Err(format!("Command failed (exit code {}):\n{}",
+                output.status.code().unwrap_or(-1),
+                combined))
         }
     }
 }

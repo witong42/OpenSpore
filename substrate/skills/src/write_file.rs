@@ -25,7 +25,8 @@ impl Skill for WriteFileSkill {
             return Err("Usage: [WRITE_FILE: \"/path\" --content=\"content\"]".to_string());
         };
 
-        let path = path_part.trim().trim_matches('"').trim_matches('\'').trim();
+        let raw_path = path_part.trim().trim_matches('"').trim_matches('\'').trim();
+        let path = openspore_core::path_utils::expand_tilde(raw_path);
 
         // Content might be wrapped in quotes by the LLM
         let mut content = content_part.trim();
@@ -40,11 +41,14 @@ impl Skill for WriteFileSkill {
             return Err("Empty file path.".to_string());
         }
 
-        if let Some(parent) = Path::new(path).parent() {
+        if let Some(parent) = Path::new(&path).parent() {
             fs::create_dir_all(parent).await.ok();
         }
 
-        fs::write(path, content)
+        // Unescape newlines
+        let final_content = content.replace("\\n", "\n");
+
+        fs::write(&path, final_content)
             .await
             .map_err(|e| format!("Failed to write {}: {}", path, e))?;
 

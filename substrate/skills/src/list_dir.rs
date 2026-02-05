@@ -15,9 +15,10 @@ impl Skill for ListDirSkill {
     }
 
     async fn execute(&self, args: &str) -> Result<String, String> {
-        let path = args.trim().trim_matches('"').trim_matches('\'');
+        let raw_path = args.trim().trim_matches('"').trim_matches('\'');
+        let path = openspore_core::path_utils::expand_tilde(raw_path);
 
-        let mut entries = fs::read_dir(path)
+        let mut entries = fs::read_dir(&path)
             .await
             .map_err(|e| format!("Failed to read dir {}: {}", path, e))?;
 

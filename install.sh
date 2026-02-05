@@ -71,7 +71,7 @@ mkdir -p "$INSTALL_DIR/workspace/context"
 mkdir -p "$INSTALL_DIR/workspace/memory"
 mkdir -p "$INSTALL_DIR/workspace/knowledge"
 mkdir -p "$INSTALL_DIR/workspace/preferences"
-mkdir -p "$INSTALL_DIR/workspace/autonomy/state"
+mkdir -p "$INSTALL_DIR/workspace/autonomy/proposals"
 mkdir -p "$INSTALL_DIR/workspace/cron"
 mkdir -p "$INSTALL_DIR/skills"
 

@@ -1,7 +1,8 @@
-//! OpenSpore TUI - Simple REPL-style Interface
-//! Clean, readable, copy-paste friendly
+//! OpenSpore TUI - Enhanced REPL with History & Signal Handling
+//! Uses rustyline for readline-like experience
 
-use std::io::{self, Write};
+use rustyline::error::ReadlineError;
+use rustyline::DefaultEditor;
 use tokio::sync::mpsc;
 
 const VERSION: &str = "0.1.0";
@@ -15,7 +16,6 @@ mod color {
     pub const YELLOW: &str = "\x1b[33m";
     pub const CYAN: &str = "\x1b[36m";
     pub const MAGENTA: &str = "\x1b[35m";
-    pub const WHITE: &str = "\x1b[37m";
 }
 
 /// Main run function
@@ -40,12 +40,23 @@ async fn repl_loop() -> anyhow::Result<()> {
     println!();
     println!("{}{}🍄 OpenSpore v{}{}", color::BOLD, color::CYAN, VERSION, color::RESET);
     println!("{}Type a message, or 'help' for commands. 'exit' to quit.{}", color::DIM, color::RESET);
+    println!("{}Use ↑/↓ arrows for history, Ctrl+C to cancel input{}", color::DIM, color::RESET);
     println!("{}─────────────────────────────────────────────────────{}", color::DIM, color::RESET);
     println!();
 
+    // Initialize Core Components ONCE
+    let (brain, memory, config) = if let Ok(config) = openspore_core::config::AppConfig::load() {
+        let state = openspore_core::state::AppState::new(config.clone());
+        let memory = openspore_memory::MemorySystem::new(&state);
+        let brain = openspore_brain::Brain::new(config.clone());
+        (Some(brain), Some(memory), Some(config))
+    } else {
+        (None, None, None)
+    };
+
     // Start Watchman in background
-    if let Ok(config) = openspore_core::config::AppConfig::load() {
-        let watchman = std::sync::Arc::new(openspore_watchman::Watchman::new(config));
+    if let (Some(brain), Some(memory), Some(config)) = (&brain, &memory, &config) {
+        let watchman = std::sync::Arc::new(openspore_watchman::Watchman::new(config.clone(), brain.clone_brain(), memory.clone()));
         let wm = watchman.clone();
         tokio::spawn(async move {
             println!("{}👀 Watchman started (monitoring filesystem){}", color::DIM, color::RESET);
@@ -56,19 +67,35 @@ async fn repl_loop() -> anyhow::Result<()> {
     }
 
     // Start Telegram Gateway in background (if token present)
-    if std::env::var("TELEGRAM_BOT_TOKEN").is_ok() {
-        tokio::spawn(async move {
-            if let Ok(tg) = openspore_telegram::TelegramChannel::new() {
-                println!("{}📡 Telegram started (listening for messages){}", color::DIM, color::RESET);
-                if let Err(e) = tg.start().await {
+    let telegram = if std::env::var("TELEGRAM_BOT_TOKEN").is_ok() {
+        if let Ok(tg) = openspore_telegram::TelegramChannel::new() {
+            println!("{}📡 Telegram started (listening for messages){}", color::DIM, color::RESET);
+            let tg_clone = tg.clone();
+            tokio::spawn(async move {
+                if let Err(e) = tg_clone.start().await {
                     eprintln!("{}⚠️ Telegram error: {}{}", color::YELLOW, e, color::RESET);
                 }
-            }
+            });
+            Some(tg)
+        } else { None }
+    } else { None };
+
+    // Start Autonomy Scheduler in background
+    if let (Some(brain), Some(memory)) = (&brain, &memory) {
+        let brain_clone = brain.clone_brain();
+        let memory_clone = memory.clone();
+        let tg_clone = telegram.clone();
+        tokio::spawn(async move {
+            openspore_autonomy::SporeScheduler::start(brain_clone, memory_clone, tg_clone).await;
         });
     }
 
     let (tx, mut rx) = mpsc::channel::<String>(10);
-    let mut history: Vec<String> = Vec::new();
+
+    // Initialize rustyline editor
+    let mut rl = DefaultEditor::new()?;
+
+    // History persistence disabled as per user request
 
     loop {
         // Check for any pending brain responses
@@ -81,86 +108,108 @@ async fn repl_loop() -> anyhow::Result<()> {
             println!();
         }
 
-        // Prompt
-        print!("{}Spore>{} ", color::GREEN, color::RESET);
-        io::stdout().flush()?;
+        // Read input with rustyline (supports history and Ctrl+C)
+        let readline = rl.readline(&format!("{}Spore>{} ", color::GREEN, color::RESET));
 
-        // Read input
-        let mut input = String::new();
-        if io::stdin().read_line(&mut input).is_err() {
-            break;
-        }
-
-        let input = input.trim().to_string();
-        if input.is_empty() {
-            continue;
-        }
-
-        history.push(input.clone());
-        let cmd = input.to_lowercase();
-
-        // Handle commands
-        if cmd == "exit" || cmd == "quit" {
-            println!("\n{}🍄 Hibernating...{}\n", color::YELLOW, color::RESET);
-            break;
-        } else if cmd == "help" {
-            println!();
-            println!("{}Commands:{}", color::YELLOW, color::RESET);
-            println!("  help     - Show this message");
-            println!("  status   - System status");
-            println!("  doctor   - Run diagnostics");
-            println!("  auto     - Trigger autonomy");
-            println!("  clear    - Clear screen");
-            println!("  exit     - Quit");
-            println!();
-            println!("{}Anything else is sent to the AI brain.{}", color::DIM, color::RESET);
-            println!();
-        } else if cmd == "clear" {
-            print!("\x1b[2J\x1b[H"); // Clear screen
-            io::stdout().flush()?;
-        } else if cmd == "status" {
-            let home = std::env::var("HOME").unwrap_or_default();
-            let skills = std::fs::read_dir(format!("{}/.openspore/skills", home))
-                .map(|r| r.count()).unwrap_or(0);
-            println!();
-            println!("{}Status:{} Active", color::CYAN, color::RESET);
-            println!("{}Substrate:{} ~/.openspore", color::CYAN, color::RESET);
-            println!("{}Skills:{} {} plugins loaded", color::CYAN, color::RESET, skills);
-            println!();
-        } else if cmd == "doctor" {
-            println!();
-            let mut doctor = openspore_doctor::SporeDoctor::new();
-            doctor.check_all();
-            println!();
-        } else if cmd == "auto" {
-            println!("\n{}🧠 Triggering autonomy engine...{}\n", color::YELLOW, color::RESET);
-            let tx_clone = tx.clone();
-            tokio::spawn(async move {
-                if let Ok(config) = openspore_core::config::AppConfig::load() {
-                    let brain = openspore_brain::Brain::new(config);
-                    let response = brain.think("Suggest one proactive action based on my context.").await;
-                    let _ = tx_clone.send(response).await;
+        match readline {
+            Ok(input) => {
+                let input = input.trim().to_string();
+                if input.is_empty() {
+                    continue;
                 }
-            });
-            // Wait a bit for the response
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            wait_for_response(&mut rx).await;
-        } else {
-            // Send to brain
-            println!("\n{}🤔 Thinking...{}", color::MAGENTA, color::RESET);
 
-            let config = openspore_core::config::AppConfig::load()?;
-            let brain = openspore_brain::Brain::new(config);
-            let response = brain.think(&input).await;
+                // Add to history
+                let _ = rl.add_history_entry(&input);
 
-            println!();
-            println!("{}🍄 {}", color::MAGENTA, color::RESET);
-            for line in response.lines() {
-                println!("   {}", line);
+                let cmd = input.to_lowercase();
+
+                // Handle commands
+                if cmd == "exit" || cmd == "quit" {
+                    println!("\n{}🍄 Hibernating...{}\n", color::YELLOW, color::RESET);
+                    break;
+                } else if cmd == "help" {
+                    println!();
+                    println!("{}Commands:{}", color::YELLOW, color::RESET);
+                    println!("  help     - Show this message");
+                    println!("  status   - System status");
+                    println!("  doctor   - Run diagnostics");
+                    println!("  auto     - Trigger autonomy");
+                    println!("  clear    - Clear screen");
+                    println!("  exit     - Quit");
+                    println!();
+                    println!("{}Keyboard Shortcuts:{}", color::YELLOW, color::RESET);
+                    println!("  ↑/↓      - Navigate command history");
+                    println!("  Ctrl+C   - Cancel current input");
+                    println!("  Ctrl+D   - Exit");
+                    println!();
+                    println!("{}Anything else is sent to the AI brain.{}", color::DIM, color::RESET);
+                    println!();
+                } else if cmd == "clear" {
+                    print!("\x1b[2J\x1b[H"); // Clear screen
+                    use std::io::Write;
+                    std::io::stdout().flush()?;
+                } else if cmd == "status" {
+                    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+                    let skills = std::fs::read_dir(format!("{}/.openspore/skills", home))
+                        .map(|r| r.count()).unwrap_or(0);
+                    println!();
+                    println!("{}Status:{} Active", color::CYAN, color::RESET);
+                    println!("{}Substrate:{} ~/.openspore", color::CYAN, color::RESET);
+                    println!("{}Skills:{} {} plugins loaded", color::CYAN, color::RESET, skills);
+                    println!();
+                } else if cmd == "doctor" {
+                    println!();
+                    let mut doctor = openspore_doctor::SporeDoctor::new();
+                    doctor.check_all();
+                    println!();
+                } else if cmd == "auto" {
+                    println!("\n{}🧠 Triggering autonomy engine...{}\n", color::YELLOW, color::RESET);
+                    let tx_clone = tx.clone();
+                    let brain_clone = brain.clone().map(|b| b.clone_brain()); // Option<Brain>
+                    tokio::spawn(async move {
+                        if let Some(brain) = brain_clone {
+                            let response = brain.think("Suggest one proactive action based on my context.").await;
+                            let _ = tx_clone.send(response).await;
+                        }
+                    });
+                    // Wait a bit for the response
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    wait_for_response(&mut rx).await;
+                } else {
+                    // Send to brain
+                    println!("\n{}🤔 Thinking...{}", color::MAGENTA, color::RESET);
+
+                    if let Some(brain) = &brain {
+                        let response = brain.think(&input).await;
+                        println!();
+                        println!("{}🍄 {}", color::MAGENTA, color::RESET);
+                        for line in response.lines() {
+                            println!("   {}", line);
+                        }
+                        println!();
+                    } else {
+                        eprintln!("{}⚠️ Brain not initialized (check config){}", color::YELLOW, color::RESET);
+                    }
+                }
             }
-            println!();
+            Err(ReadlineError::Interrupted) => {
+                // Ctrl+C pressed - just show a new prompt
+                println!("{}^C{}", color::DIM, color::RESET);
+                continue;
+            }
+            Err(ReadlineError::Eof) => {
+                // Ctrl+D pressed - exit gracefully
+                println!("\n{}🍄 Hibernating...{}\n", color::YELLOW, color::RESET);
+                break;
+            }
+            Err(err) => {
+                eprintln!("{}Error: {}{}", color::YELLOW, err, color::RESET);
+                break;
+            }
         }
     }
+
+    // History persistence disabled
 
     Ok(())
 }
