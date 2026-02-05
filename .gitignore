@@ -1,0 +1,25 @@
+# Rust / Cargo
+**/target/
+Cargo.lock
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+openspore.log
+
+# Workspace / Data
+workspace/

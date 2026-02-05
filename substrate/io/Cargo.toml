@@ -1,0 +1,11 @@
+[package]
+name = "openspore-io"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.36", features = ["full", "process"] }
+tracing = "0.1"
+thiserror = "1.0"
+async-trait = "0.1"
+# OS Specific dependencies will be added here later (e.g. objc for mac)

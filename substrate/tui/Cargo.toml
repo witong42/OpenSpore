@@ -1,0 +1,14 @@
+[package]
+name = "openspore-tui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.36", features = ["full", "sync"] }
+anyhow = "1.0"
+openspore-core = { path = "../core" }
+openspore-brain = { path = "../brain" }
+openspore-doctor = { path = "../doctor" }
+openspore-watchman = { path = "../watchman" }
+openspore-telegram = { path = "../channels/telegram" }
+

@@ -1,0 +1,13 @@
+[package]
+name = "openspore-telegram"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+teloxide = { version = "0.12", features = ["macros"] }
+tokio = { version = "1.36", features = ["full"] }
+openspore-core = { path = "../../core" }
+openspore-brain = { path = "../../brain" }
+anyhow = "1.0"
+tracing = "0.1"
+async-trait = "0.1"

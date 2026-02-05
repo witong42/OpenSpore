@@ -1,0 +1,127 @@
+//! Telegram Channel for OpenSpore
+//! Port of opensporejs/src/channels/telegram.js
+
+use teloxide::prelude::*;
+use teloxide::types::ParseMode;
+use openspore_core::config::AppConfig;
+use openspore_brain::Brain;
+use tracing::info;
+use std::sync::Arc;
+
+pub struct TelegramChannel {
+    token: String,
+    allowed_users: Vec<String>,
+}
+
+impl TelegramChannel {
+    pub fn new() -> anyhow::Result<Self> {
+        let _config = AppConfig::load()?;
+        let token = std::env::var("TELEGRAM_BOT_TOKEN")
+            .map_err(|_| anyhow::anyhow!("TELEGRAM_BOT_TOKEN not set"))?;
+
+        let allowed_users = std::env::var("TELEGRAM_ALLOWED_USERS")
+            .unwrap_or_default()
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        Ok(Self {
+            token,
+            allowed_users,
+        })
+    }
+
+    /// Start the Telegram bot listener (Long Polling)
+    pub async fn start(&self) -> anyhow::Result<()> {
+        info!("📡 Telegram Gateway Starting...");
+
+        let bot = Bot::new(&self.token);
+        let allowed_users = self.allowed_users.clone();
+
+        // Load brain in thread/arc to share
+        let config = AppConfig::load()?;
+        let brain = Arc::new(Brain::new(config));
+
+        info!("✅ Telegram Gateway Active. Allowed Users: {:?}", allowed_users);
+
+        teloxide::repl(bot, move |bot: Bot, msg: Message| {
+            let allowed_users = allowed_users.clone();
+            let brain = brain.clone();
+            async move {
+                let user_id = msg.from().map(|u| u.id.to_string()).unwrap_or_default();
+
+                // Security Check
+                if !allowed_users.is_empty() && !allowed_users.contains(&user_id) {
+                    let _ = bot.send_message(msg.chat.id, "⛔ Access Denied.").await;
+                    return Ok(());
+                }
+
+                if let Some(text) = msg.text() {
+                    info!("📩 [Telegram] Message from {}: {}", user_id, text);
+
+                    // Show typing action
+                    let _ = bot.send_chat_action(msg.chat.id, teloxide::types::ChatAction::Typing).await;
+
+                    // Think
+                    let response = brain.think(text).await;
+
+                    // Split and send
+                    for chunk in split_message(&response, 4000) {
+                        // Try sending with Markdown, fallback to plain text if it fails
+                        if let Err(_) = bot.send_message(msg.chat.id, chunk)
+                            .parse_mode(ParseMode::Markdown)
+                            .await
+                        {
+                            let _ = bot.send_message(msg.chat.id, chunk).await;
+                        }
+                    }
+                }
+                Ok(())
+            }
+        })
+        .await;
+
+        Ok(())
+    }
+
+    /// Stateless Send - Send a message without starting a listener (for cron/notifications)
+    pub async fn send_stateless(text: &str, target_id: Option<&str>) -> anyhow::Result<()> {
+        let token = std::env::var("TELEGRAM_BOT_TOKEN")
+            .map_err(|_| anyhow::anyhow!("TELEGRAM_BOT_TOKEN not set"))?;
+
+        let chat_id = if let Some(id) = target_id {
+            id.to_string()
+        } else {
+            std::env::var("TELEGRAM_ALLOWED_USERS")
+                .ok()
+                .and_then(|s| s.split(',').next().map(|id| id.trim().to_string()))
+                .ok_or_else(|| anyhow::anyhow!("No target user ID provided and TELEGRAM_ALLOWED_USERS not set"))?
+        };
+
+        let bot = Bot::new(token);
+
+        for chunk in split_message(text, 4000) {
+            if let Err(_) = bot.send_message(chat_id.clone(), chunk)
+                .parse_mode(ParseMode::Markdown)
+                .await
+            {
+                let _ = bot.send_message(chat_id.clone(), chunk).await;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+fn split_message(text: &str, max_length: usize) -> Vec<&str> {
+    let mut chunks = Vec::new();
+    let mut current = text;
+    while current.len() > max_length {
+        let (chunk, rest) = current.split_at(max_length);
+        chunks.push(chunk);
+        current = rest;
+    }
+    chunks.push(current);
+    chunks
+}
