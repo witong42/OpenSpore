@@ -37,6 +37,10 @@ enum Commands {
     Logs,
     /// List active sub-spores (swarm activity)
     Swarm,
+    /// Run system heartbeat and status check
+    Heartbeat,
+    /// Manually trigger daily journal synthesis
+    Journal,
     /// One-shot think for swarm/spores
     Think {
         /// The prompt for the AI
@@ -131,15 +135,41 @@ async fn main() {
                             if let Some(obj) = jobs.as_object() {
                                 let binary = format!("{}/substrate/target/release/openspore", app_dir);
                                 let mut cron_lines = Vec::new();
+
+                                // Preserve existing non-openspore cron jobs
+                                if let Ok(output) = Command::new("crontab").arg("-l").output() {
+                                    let content = String::from_utf8_lossy(&output.stdout);
+                                    for line in content.lines() {
+                                        if !line.contains("openspore job") && !line.trim().is_empty() {
+                                            cron_lines.push(line.to_string());
+                                        }
+                                    }
+                                }
+
                                 for (name, job) in obj {
                                     let schedule = job["schedule"].as_str().unwrap_or("* * * * *");
-                                    cron_lines.push(format!("{} {} job {} > /dev/null 2>&1", schedule, binary, name));
+                                    cron_lines.push(format!("{} {} job \"{}\" > /dev/null 2>&1", schedule, binary, name));
                                 }
-                                println!("Would install {} cron entries:", cron_lines.len());
-                                for line in &cron_lines {
-                                    println!("  {}", line);
+
+                                let new_crontab = cron_lines.join("\n") + "\n";
+
+                                println!("Installing {} cron entries...", cron_lines.len());
+
+                                // Write to crontab via stdin
+                                use std::io::Write;
+                                let mut child = Command::new("crontab")
+                                    .stdin(std::process::Stdio::piped())
+                                    .spawn()
+                                    .expect("Failed to spawn crontab command");
+
+                                if let Some(mut stdin) = child.stdin.take() {
+                                    stdin.write_all(new_crontab.as_bytes()).expect("Failed to write to crontab stdin");
                                 }
-                                println!("\n⚠️ Manual installation required (run: crontab -e)");
+
+                                match child.wait() {
+                                    Ok(status) if status.success() => println!("✅ Cron jobs installed successfully."),
+                                    _ => println!("❌ Failed to install cron jobs."),
+                                }
                             }
                         }
                     } else {
@@ -236,6 +266,38 @@ async fn main() {
                     println!("{}", response);
                 }
                 Err(e) => error!("Failed to load config: {}", e),
+            }
+        }
+        Some(Commands::Heartbeat) => {
+            println!("💓 [System Heartbeat]");
+            if let Ok(config) = AppConfig::load() {
+                let state = openspore_core::state::AppState::new(config.clone());
+                let brain = openspore_brain::Brain::new(config);
+                let memory = openspore_memory::MemorySystem::new(&state);
+                // Telegram might not be configured, optional
+                let telegram = openspore_telegram::TelegramChannel::new().ok();
+
+                if let Err(e) = openspore_autonomy::Heartbeat::run(&brain, &memory, telegram.as_ref()).await {
+                    error!("Heartbeat failed: {}", e);
+                }
+            } else {
+                error!("Failed to load config (is .openspore/ initialized?)");
+            }
+        }
+        Some(Commands::Journal) => {
+            println!("📓 [Daily Journal Synthesis]");
+            if let Ok(config) = AppConfig::load() {
+                let state = openspore_core::state::AppState::new(config.clone());
+                let brain = openspore_brain::Brain::new(config);
+                let memory = openspore_memory::MemorySystem::new(&state);
+
+                match openspore_autonomy::DailyJournal::run(&brain, &memory).await {
+                    Ok(Some(path)) => println!("✅ Journal created: {:?}", path),
+                    Ok(None) => println!("⏸️ No journal created (already exists or empty context)"),
+                    Err(e) => error!("Journal synthesis failed: {}", e),
+                }
+            } else {
+                error!("Failed to load config");
             }
         }
     }

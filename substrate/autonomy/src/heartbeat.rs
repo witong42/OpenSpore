@@ -51,9 +51,20 @@ impl Heartbeat {
         if let Ok(enabled) = std::env::var("AUTONOMY_ENABLED") {
             if enabled == "true" {
                 match AutonomyEngine::run(brain, memory).await {
-                    Ok(Some(proposal)) => {
-                        let filename = proposal.file_name().and_then(|f| f.to_str()).unwrap_or("proposal.md");
-                        logs.push(format!("✨ NEW PROPOSAL: {}", filename));
+                    Ok(Some(proposal_path)) => {
+                        let filename = proposal_path.file_name().and_then(|f| f.to_str()).unwrap_or("proposal.md");
+
+                        // Parse title from file
+                        let title = if let Ok(content) = std::fs::read_to_string(&proposal_path) {
+                            content.lines()
+                                .find(|line| line.starts_with("title: "))
+                                .map(|line| line.trim_start_matches("title: ").trim().to_string())
+                                .unwrap_or_else(|| filename.to_string())
+                        } else {
+                            filename.to_string()
+                        };
+
+                        logs.push(format!("✨ NEW PROPOSAL: {}", title));
                     },
                     Ok(None) => {},
                     Err(e) => {

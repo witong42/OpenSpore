@@ -1,5 +1,4 @@
 use crate::{Brain, Message};
-use regex::Regex;
 use tracing::{info, warn, error};
 
 impl Brain {
@@ -25,12 +24,6 @@ impl Brain {
         let max_depth = 12;
         let mut depth = 0;
 
-        // Robust tool regex:
-        // - Supports [NAME: ARG] with interior spaces
-        // - Supports bare NAME: ARG
-        // - Non-greedy arg capture to avoid consuming multiple tools in one line
-        let tool_regex = Regex::new(r"(?m)(?:\[\s*)?(?P<name>[A-Z0-9_]{3,})\s*:\s*(?P<arg>.*?)(?:\s*\]|$)").unwrap();
-
         loop {
             if depth >= max_depth {
                 warn!("⚠️ Depth limit hit ({}). Terminating tool loop to prevent infinite recursion.", max_depth);
@@ -40,35 +33,8 @@ impl Brain {
 
             info!("Raw LLM Output (Depth {}): {:?}", depth, content);
 
-            let mut tools_to_run = Vec::new();
-            // Process the content Once. Redundant markdown extraction removed to prevent double execution.
-            for cap in tool_regex.captures_iter(&content) {
-                let name = cap["name"].trim().to_uppercase();
-                let mut arg = cap["arg"].trim().to_string();
-
-                // 1. Cleanup: Strip trailing bracket if it was part of the capture (bare-tool format match)
-                if arg.ends_with(']') {
-                    arg = arg[..arg.len()-1].trim().to_string();
-                }
-
-                // 2. Cleanup: Strip markdown markers if present inside arg
-                if arg.contains("```") {
-                    arg = arg.replace("```tool_code", "").replace("```json", "").replace("```", "").trim().to_string();
-                }
-
-                // 3. Quote cleanup
-                if (arg.starts_with('"') && arg.ends_with('"')) || (arg.starts_with('\'') && arg.ends_with('\'')) {
-                    if arg.len() >= 2 {
-                        arg = arg[1..arg.len()-1].to_string();
-                    }
-                }
-
-                // Validate if it's actually a registered tool to avoid false positives with normal text
-                if self.skill_loader.get(&name).is_some() {
-                    info!("🔎 Detected Tool: [{} : {}]", name, arg);
-                    tools_to_run.push((name, arg));
-                }
-            }
+            // Robust Parser (State Machine) to handle nested brackets/JSON
+            let tools_to_run = self.extract_tools(&content);
 
             if tools_to_run.is_empty() {
                 break;
@@ -79,6 +45,7 @@ impl Brain {
             for (name, arg) in tools_to_run {
                 if let Some(skill) = self.skill_loader.get(&name) {
                     info!("⚙️ Executing: [{} : {}]", name, arg);
+                    println!("⚙️ Executing: [{} : {}]", name, arg); // Force visual output in TUI
                     match skill.execute(&arg).await {
                         Ok(output) => {
                             let preview = output.chars().take(100).collect::<String>();
@@ -143,16 +110,104 @@ impl Brain {
         });
 
         // Log significant events to LOGS.md
-        if user_prompt.len() > 100 || content.len() > 200 {
-            let log_entry = format!("\n[{}] 💬 Interaction: {} chars in, {} chars out\n",
-                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                user_prompt.len(),
-                content.len()
-            );
-            let _ = self.memory.save_journal(&log_entry).await;
-        }
+        // Log FULL raw interaction to LOGS.md
+        let log_entry = format!("\n[{}]\nUser: {}\n\nAI: {}\n",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+            user_prompt,
+            content
+        );
+        let _ = self.memory.save_journal(&log_entry).await;
 
         info!("✅ Cycle finished in {:?}", start_time.elapsed());
         content
+    }
+
+    fn extract_tools(&self, content: &str) -> Vec<(String, String)> {
+        let mut tools = Vec::new();
+        let chars: Vec<char> = content.chars().collect();
+        let len = chars.len();
+        let mut i = 0;
+
+        while i < len {
+            // Find start: '[' followed by 'NAME:'
+            if chars[i] == '[' {
+                // Scan forward for ':' to check if this is a tool candidate
+                let mut j = i + 1;
+                while j < len && (chars[j].is_ascii_uppercase() || chars[j].is_numeric() || chars[j] == '_') {
+                    j += 1;
+                }
+
+                // Must be at least 3 chars name and followed by ':'
+                if j > i + 3 && j < len && chars[j] == ':' {
+                    let name: String = chars[i+1..j].iter().collect(); // Extract NAME
+
+                    // Start parsing ARG after ':'
+                    let arg_start = j + 1;
+                    let mut current = arg_start;
+                    let mut depth = 1; // We rely on the initial '[' as depth 1
+                    let mut in_quote = false;
+                    let mut quote_char = '\0';
+                    let mut escape = false;
+
+                    while current < len {
+                        let c = chars[current];
+
+                        if escape {
+                            escape = false;
+                        } else if c == '\\' {
+                            escape = true;
+                        } else if in_quote {
+                            if c == quote_char {
+                                in_quote = false;
+                            }
+                        } else {
+                            match c {
+                                '"' | '\'' | '`' => {
+                                    in_quote = true;
+                                    quote_char = c;
+                                }
+                                '[' => depth += 1,
+                                ']' => {
+                                    depth -= 1;
+                                    if depth == 0 {
+                                        // Found end of tool
+                                        break;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        current += 1;
+                    }
+
+                    if depth == 0 {
+                        // Found valid tool
+                        let raw_arg: String = chars[arg_start..current].iter().collect();
+                        let mut arg = raw_arg.trim().to_string();
+
+                         // Cleanup markdown/quotes logic from before
+                        if arg.contains("```") {
+                             arg = arg.replace("```tool_code", "").replace("```json", "").replace("```", "").trim().to_string();
+                        }
+                        if (arg.starts_with('"') && arg.ends_with('"')) || (arg.starts_with('\'') && arg.ends_with('\'')) {
+                             if arg.len() >= 2 {
+                                 arg = arg[1..arg.len()-1].to_string();
+                             }
+                        }
+
+                        // Validate against SkillLoader
+                        if self.skill_loader.get(&name).is_some() {
+                            // info!("🔎 Detected Tool: [{} : {}]", name, arg);
+                            tools.push((name, arg));
+                        }
+
+                        i = current; // Advance main loop
+                        continue;
+                    }
+                }
+            }
+            i += 1;
+        }
+        tools
     }
 }

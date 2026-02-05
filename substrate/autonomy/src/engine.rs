@@ -36,6 +36,7 @@ Criteria:
 1. Must be code-related (refactor, new script, bugfix).
 2. Must be SAFE (no deletion of data).
 3. Must be valuable to the user.
+4. **NO REPETITION**: If the logs show a similar proposal was just made or failed, DO NOT propose it again. Suggest something completely different (e.g., UI, performance, documentation).
 
 Output JSON ONLY:
 {{

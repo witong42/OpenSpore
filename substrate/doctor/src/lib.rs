@@ -125,7 +125,6 @@ impl SporeDoctor {
             "workspace/memory",
             "workspace/preferences",
             "workspace/autonomy",
-            "workspace/autonomy/state",
             "workspace/cron",
             "skills",
         ];

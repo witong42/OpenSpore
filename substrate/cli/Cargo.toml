@@ -13,5 +13,8 @@ openspore-tui = { path = "../tui" }
 openspore-brain = { path = "../brain" }
 openspore-doctor = { path = "../doctor" }
 openspore-swarm = { path = "../swarm" }
+openspore-autonomy = { path = "../autonomy" }
+openspore-memory = { path = "../memory" }
+openspore-telegram = { path = "../channels/telegram" }
 serde_json = "1.0"
 tracing-appender = "0.2"

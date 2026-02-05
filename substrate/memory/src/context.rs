@@ -18,6 +18,25 @@ pub struct ContextManager {
     pub max_raw_items: usize,
 }
 
+#[derive(Debug, Clone)]
+pub struct WorkingContext {
+    pub timestamp: chrono::DateTime<chrono::Local>,
+    pub summary: String,
+    pub recent: String,
+    pub older_items: Vec<MemoryItem>,
+}
+
+impl Default for WorkingContext {
+    fn default() -> Self {
+        Self {
+            timestamp: chrono::Local::now(),
+            summary: String::new(),
+            recent: String::new(),
+            older_items: Vec::new(),
+        }
+    }
+}
+
 impl ContextManager {
     pub fn new(state: &AppState) -> Self {
         let memory = MemorySystem::new(state);
@@ -55,6 +74,7 @@ impl ContextManager {
         }
 
         Ok(WorkingContext {
+            timestamp: chrono::Local::now(),
             summary,
             recent: recent_items.iter().map(|m| m.content.clone()).collect::<Vec<_>>().join("\n\n"),
             older_items,
@@ -96,17 +116,6 @@ impl ContextManager {
             }
         }
     }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct WorkingContext {
-    pub summary: String,
-    pub recent: String,
-    pub older_items: Vec<MemoryItem>,
-}
-
-impl ContextManager {
-    // ... existing methods ...
 
     /// Save interaction helper (missing in previous port)
     pub async fn save_interaction(&self, content: &str, tags: Vec<String>, memory_type: Option<&str>) -> Result<Option<PathBuf>> {

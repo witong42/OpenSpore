@@ -16,8 +16,7 @@ impl DailyJournal {
         let journal_path = journal_dir.join(format!("{}.md", today_str));
 
         if journal_path.exists() {
-            info!("⏸️ Journal already exists for today. Skipping.");
-            return Ok(None);
+            info!("🔄 Journal exists. Appending new context.");
         }
 
         // 1. Collect Context
@@ -34,8 +33,27 @@ impl DailyJournal {
         if !journal_dir.exists() {
             fs::create_dir_all(&journal_dir)?;
         }
-        fs::write(&journal_path, synthesis.trim())?;
-        info!("✅ Journal synthesized and written to {}", journal_path.display());
+
+        if journal_path.exists() {
+            // Append mode
+            let timestamp = chrono::Local::now().format("%H:%M:%S");
+            let append_content = format!("\n\n---\n\n## 🔄 Update [{}]\n\n{}", timestamp, synthesis.trim());
+
+            // Read existing to append (or just use append open option)
+            // Using fs::OpenOptions for atomic append is cleaner
+            use std::io::Write;
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .append(true)
+                .open(&journal_path)?;
+
+            write!(file, "{}", append_content)?;
+            info!("✅ Journal updated (appended) at {}", journal_path.display());
+        } else {
+            // Create mode
+            fs::write(&journal_path, synthesis.trim())?;
+            info!("✅ Journal created at {}", journal_path.display());
+        }
 
         // 3. Archive & Cleanup
         Self::archive_interactions(memory, &today_str, &interactions)?;
