@@ -18,20 +18,6 @@ impl MemorySystem {
             }
         }
 
-        // Create identity core files if missing
-        let identity_dir = self.memory_root.join("identity");
-        let core_files = [
-            ("AGENTS.md", "# Agents\nList of specialized agents and their roles."),
-            ("SOUL.md", "# Agent Soul & Personality\nCore values, tone of voice, and personality traits."),
-            ("USER.md", "# User Profile\nInformation about William and his preferences."),
-        ];
-
-        for (name, template) in core_files {
-            let file_path = identity_dir.join(name);
-            if !file_path.exists() {
-                fs::write(&file_path, template).await?;
-            }
-        }
 
         // Ensure autonomy directories
         for dir in ["autonomy/proposals"] {

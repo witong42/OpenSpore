@@ -46,6 +46,10 @@ async fn repl_loop() -> anyhow::Result<()> {
 
     // Initialize Core Components ONCE
     let (brain, memory, config) = if let Ok(config) = openspore_core::config::AppConfig::load() {
+        // Run Pre-flight Diagnostic (Doctor) synchronously
+        let mut doctor = openspore_doctor::SporeDoctor::new();
+        doctor.check_all();
+
         let state = openspore_core::state::AppState::new(config.clone());
         let memory = openspore_memory::MemorySystem::new(&state);
         let brain = openspore_brain::Brain::new(config.clone());

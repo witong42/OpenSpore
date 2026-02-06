@@ -9,32 +9,31 @@ impl openspore_memory::context::ContextCompressor for Brain {
                 return Ok(current.to_string());
             }
 
-            let compress_prompt = format!(r#"Compress this session history into a concise summary.
+            let compress_prompt = format!(r#"Synthesize a new, concise session summary from the existing state and the latest interactions.
 
-Current Summary:
+PREVIOUS SESSION STATE:
 {}
 
-New Items to Integrate:
+NEW INTERACTIONS TO SYNTHESIZE:
 {}
 
-Create an updated summary that:
-1. Preserves key facts, decisions, and context
-2. Removes redundant information
-3. Maintains chronological flow
-4. Stays under 500 words
+CONSTRUCT A REPLACEMENT SUMMARY THAT:
+1. Preserves only high-leverage facts and decisions
+2. Discards minor conversational filler or resolved issues
+3. STRICTLY stays under 400 words
 
-Return ONLY the compressed summary, no preamble."#, current, new_items);
+Return only the new summary text."#, current, new_items);
 
-            match self.complete(&[Message{role:"user".into(), content: compress_prompt}]).await {
-                Ok(compressed) => {
-                    info!("📦 Compressed {} chars -> {} chars", current.len() + new_items.len(), compressed.len());
-                    Ok(compressed)
-                },
-                Err(e) => {
-                    warn!("Compression failed: {}, keeping current", e);
-                    Ok(format!("{}\n\n{}", current, new_items))
-                }
-            }
+             match self.complete(&[Message{role:"user".into(), content: compress_prompt}]).await {
+                 Ok(compressed) => {
+                     info!("📦 Compressed {} chars -> {} chars", current.len() + new_items.len(), compressed.len());
+                     Ok(compressed)
+                 },
+                 Err(e) => {
+                    warn!("Context compression failed: {}. Falling back to existing summary to prevent substrate bloat.", e);
+                    Ok(current.to_string())
+                 }
+             }
         })
     }
 }

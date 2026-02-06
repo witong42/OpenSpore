@@ -7,6 +7,7 @@ impl MemorySystem {
     /// Get all memories from a category (lines 211-228 in JS)
     pub fn get_memories(&self, category: &str) -> Vec<MemoryItem> {
         let dir = self.memory_root.join(category);
+
         if !dir.exists() {
             return vec![];
         }
@@ -105,6 +106,19 @@ impl MemorySystem {
                         score += 50; // Boost filename matches
                     }
                     score += lower_content.matches(kw).count().min(20);
+                }
+
+                // Recency Boost (Add weight to more recent events)
+                if let Ok(meta) = std::fs::metadata(path) {
+                    if let Ok(modified) = meta.modified() {
+                        let elapsed = modified.elapsed().unwrap_or_default().as_secs();
+                        let hours_since = elapsed / 3600;
+                        if hours_since < 2 {
+                            score += 50; // Last 2 hours: Strong boost
+                        } else if hours_since < 24 {
+                            score += 20; // Last 24 hours: Moderate boost
+                        }
+                    }
                 }
 
                 if score > 0 {

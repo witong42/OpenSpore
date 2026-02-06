@@ -13,6 +13,7 @@ mod thinking;
 mod learning;
 mod compression;
 mod context_assembler;
+mod parser;
 
 use serde::{Deserialize, Serialize};
 

@@ -267,15 +267,21 @@ impl SporeDoctor {
                 "MISSING_SOUL_FILE" => {
                     if let Some(file) = &issue.meta {
                         let path = self.root.join(file);
-                        let template = if file.contains("QUEUE.md") {
+
+                        // Try to find template in substrate/core/identity template
+                        let filename = path.file_name().and_then(|f| f.to_str()).unwrap_or("");
+                        let template_path = self.root.join("substrate/core/identity template").join(filename);
+
+                        let content = if template_path.exists() {
+                            std::fs::read_to_string(&template_path).unwrap_or_else(|_| {
+                                format!("# {}\nRestoration failed, source template unreadable.", filename)
+                            })
+                        } else if file.contains("QUEUE.md") {
                             "# Proactive Queue\n\n## Pending\n\n## Completed\n".to_string()
                         } else if file.contains("LOGS.md") {
                             "# System Logs\n\nInitialized by Doctor.\n".to_string()
                         } else {
-                            let name = path.file_stem()
-                                .and_then(|s| s.to_str())
-                                .unwrap_or("Unknown");
-                            format!("# {}\nInitial substrate established by Doctor.", name)
+                            format!("# {}\nInitial substrate established by Doctor.", filename)
                         };
 
                         // Create parent directory if needed
@@ -283,8 +289,8 @@ impl SporeDoctor {
                             std::fs::create_dir_all(parent).ok();
                         }
 
-                        if std::fs::write(&path, template).is_ok() {
-                            log(&format!("   ✓ Restored stub for: {}", file), "gray");
+                        if std::fs::write(&path, content).is_ok() {
+                            log(&format!("   ✓ Restored identity file from template: {}", file), "gray");
                         }
                     }
                 }

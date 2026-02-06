@@ -103,7 +103,7 @@ impl ContextManager {
                 } else {
                     // Cleanup older items
                     for item in items {
-                        let path = self.memory.memory_root.join("context").join(&item.filename);
+                        let path = self.memory.project_root.join("context").join(&item.filename);
                         self.memory.mark_as_internal_write(path.clone()).await;
                         let _ = fs::remove_file(path).await;
                     }

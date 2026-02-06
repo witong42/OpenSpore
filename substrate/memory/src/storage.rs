@@ -74,6 +74,14 @@ impl MemorySystem {
     /// Append to LOGS.md (non-blocking journal, lines 192-209 in JS)
     pub async fn save_journal(&self, entry: &str) -> Result<()> {
         let path = self.memory_root.join("context").join("LOGS.md");
+
+        // Ensure parent directory exists
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                fs::create_dir_all(parent).await?;
+            }
+        }
+
         self.mark_as_internal_write(path.clone()).await;
 
         let mut file = tokio::fs::OpenOptions::new()
