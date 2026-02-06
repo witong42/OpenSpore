@@ -14,3 +14,30 @@ pub fn try_parse_json(args: &str) -> Option<Value> {
 pub fn get_str_field(val: &Value, field: &str) -> Option<String> {
     val.get(field).and_then(|v| v.as_str()).map(|s| s.to_string())
 }
+
+/// Robustly unescape a string coming from an LLM tool call.
+/// Handles \n, \r, \t, \\, \", and \'.
+pub fn unescape(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            if let Some(&next) = chars.peek() {
+                match next {
+                    'n' => { result.push('\n'); chars.next(); }
+                    'r' => { result.push('\r'); chars.next(); }
+                    't' => { result.push('\t'); chars.next(); }
+                    '\\' => { result.push('\\'); chars.next(); }
+                    '"' => { result.push('"'); chars.next(); }
+                    '\'' => { result.push('\''); chars.next(); }
+                    _ => { result.push('\\'); }
+                }
+            } else {
+                result.push('\\');
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}

@@ -12,6 +12,9 @@ pub struct Heartbeat;
 impl Heartbeat {
     pub async fn run(brain: &Brain, memory: &MemorySystem, telegram: Option<&TelegramChannel>) -> Result<()> {
         info!("--- OpenSpore Heartbeat ---");
+        if telegram.is_none() {
+            info!("📡 Heartbeat: Telegram is not configured, running as local-only report.");
+        }
         let mut logs = Vec::new();
         let mut status = "🟢 OPTIMAL";
 
@@ -84,15 +87,16 @@ impl Heartbeat {
             time
         );
 
-        info!("{}", report);
+        info!("--- Heartbeat Result ---\n{}", report);
 
-        if let Some(tg) = telegram {
-            if let Err(e) = tg.send_raw(&report).await {
-                error!("Failed to send heartbeat to Telegram: {}", e);
-            } else {
-                info!("✅ Telegram notification sent.");
-            }
-        }
+         if let Some(tg) = telegram {
+             info!("📡 Heartbeat: Attempting to send report via Telegram...");
+             if let Err(e) = tg.send_raw(&report).await {
+                 error!("❌ Heartbeat: Failed to send report to Telegram: {}", e);
+             } else {
+                 info!("✅ Heartbeat: Telegram notification sent.");
+             }
+         }
 
         Ok(())
     }

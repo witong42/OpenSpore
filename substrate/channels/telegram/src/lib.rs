@@ -113,13 +113,23 @@ impl TelegramChannel {
         };
 
         let bot = Bot::new(token);
+        info!("📡 Telegram: Sending message to chat_id: {}", chat_id);
 
         for chunk in split_message(text, 4000) {
-            if let Err(_) = bot.send_message(chat_id.clone(), chunk)
+            match bot.send_message(chat_id.clone(), chunk)
                 .parse_mode(ParseMode::MarkdownV2)
                 .await
             {
-                let _ = bot.send_message(chat_id.clone(), chunk).await;
+                Ok(_) => info!("✅ Telegram: Message sent successfully."),
+                Err(e) => {
+                    info!("⚠️ Telegram: MarkdownV2 failed, retrying with plain text. Error: {}", e);
+                    if let Err(e2) = bot.send_message(chat_id.clone(), chunk).await {
+                        info!("❌ Telegram: Final fallback failed. Error: {}", e2);
+                        return Err(anyhow::anyhow!("Failed to send Telegram message: {}", e2));
+                    } else {
+                        info!("✅ Telegram: Fallback message sent successfully.");
+                    }
+                }
             }
         }
 

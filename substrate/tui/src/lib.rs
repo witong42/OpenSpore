@@ -71,18 +71,32 @@ async fn repl_loop() -> anyhow::Result<()> {
     }
 
     // Start Telegram Gateway in background (if token present)
-    let telegram = if std::env::var("TELEGRAM_BOT_TOKEN").is_ok() {
-        if let Ok(tg) = openspore_telegram::TelegramChannel::new() {
-            println!("{}📡 Telegram started (listening for messages){}", color::DIM, color::RESET);
-            let tg_clone = tg.clone();
-            tokio::spawn(async move {
-                if let Err(e) = tg_clone.start().await {
-                    eprintln!("{}⚠️ Telegram error: {}{}", color::YELLOW, e, color::RESET);
+    let telegram = if let Some(token) = config.as_ref().and_then(|c| c.telegram_bot_token.as_ref()) {
+        if !token.is_empty() {
+             match openspore_telegram::TelegramChannel::new() {
+                Ok(tg) => {
+                    println!("{}📡 Telegram started (listening for messages){}", color::DIM, color::RESET);
+                    let tg_clone = tg.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = tg_clone.start().await {
+                            eprintln!("{}⚠️ Telegram error: {}{}", color::YELLOW, e, color::RESET);
+                        }
+                    });
+                    Some(tg)
                 }
-            });
-            Some(tg)
-        } else { None }
-    } else { None };
+                Err(e) => {
+                    eprintln!("{}⚠️ Failed to initialize Telegram channel: {}{}", color::YELLOW, e, color::RESET);
+                    None
+                }
+            }
+        } else {
+            println!("{}ℹ️ Telegram disabled (token is empty in config){}", color::DIM, color::RESET);
+            None
+        }
+    } else {
+        println!("{}ℹ️ Telegram disabled (no token found in config){}", color::DIM, color::RESET);
+        None
+    };
 
     // Start Autonomy Scheduler in background
     if let (Some(brain), Some(memory)) = (&brain, &memory) {

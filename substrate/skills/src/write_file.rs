@@ -45,8 +45,8 @@ impl Skill for WriteFileSkill {
             fs::create_dir_all(parent).await.ok();
         }
 
-        // Unescape newlines
-        let final_content = content.replace("\\n", "\n");
+        // Unescape content (handles \n, \", etc.)
+        let final_content = crate::utils::unescape(content);
 
         fs::write(&path, final_content)
             .await

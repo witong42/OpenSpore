@@ -59,9 +59,9 @@ impl Skill for EditFileSkill {
             .await
             .map_err(|e| format!("Could not read {}: {}", path, e))?;
 
-        // Unescape newlines for target and replacement
-        let target_unescaped = target.replace("\\n", "\n");
-        let replacement_unescaped = replacement.replace("\\n", "\n");
+        // Unescape target and replacement (handles \n, \", etc.)
+        let target_unescaped = crate::utils::unescape(&target);
+        let replacement_unescaped = crate::utils::unescape(&replacement);
 
         if !content.contains(&target_unescaped) {
             return Err(format!("Target text not found in {}", path));

@@ -106,8 +106,8 @@ impl Skill for SubmitSkill {
             fs::create_dir_all(&target_dir).await.map_err(|e| e.to_string())?;
         }
 
-        // Unescape newlines (common LLM behavior to provide \n in one-line tool calls)
-        let final_code = code.replace("\\n", "\n");
+        // Unescape code (handles \n, \", etc.)
+        let final_code = crate::utils::unescape(&code);
 
         fs::write(&file_path, final_code).await.map_err(|e| e.to_string())?;
 

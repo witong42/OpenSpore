@@ -25,24 +25,26 @@ impl Skill for ExecSkill {
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
-        let mut combined = stdout;
+        let mut output_string = String::new();
+
+        if !stdout.is_empty() {
+            output_string.push_str(&format!("[STDOUT]\n{}\n", stdout));
+        }
+
         if !stderr.is_empty() {
-            if !combined.is_empty() {
-                combined.push_str("\n");
-            }
-            combined.push_str(&format!("[STDERR]\n{}", stderr));
+            output_string.push_str(&format!("[STDERR]\n{}\n", stderr));
         }
 
         if output.status.success() {
-            if combined.is_empty() {
+            if output_string.is_empty() {
                 Ok("✅ Command executed successfully (no output).".to_string())
             } else {
-                Ok(combined)
+                Ok(output_string)
             }
         } else {
             Err(format!("Command failed (exit code {}):\n{}",
                 output.status.code().unwrap_or(-1),
-                combined))
+                output_string))
         }
     }
 }

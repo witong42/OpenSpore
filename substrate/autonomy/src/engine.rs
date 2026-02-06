@@ -1,4 +1,5 @@
 use openspore_brain::Brain;
+use regex::Regex;
 use openspore_memory::MemorySystem;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -49,7 +50,14 @@ Output JSON ONLY:
 "#);
 
         let raw = brain.think(&prompt).await;
-        let clean_json = raw.trim_start_matches("```json").trim_start_matches("```").trim_end_matches("```").trim();
+        let trimmed = raw.trim_start_matches("```json").trim_start_matches("```").trim_end_matches("```").trim();
+
+        // Use regex to extract the JSON object if there's surrounding text
+        let re = Regex::new(r"(?s).*?(\{.*\}).*").unwrap();
+        let clean_json = match re.captures(trimmed) {
+            Some(caps) => caps.get(1).map_or(trimmed, |m| m.as_str()),
+            None => trimmed,
+        };
 
         let idea: Idea = match serde_json::from_str(clean_json) {
             Ok(i) => i,

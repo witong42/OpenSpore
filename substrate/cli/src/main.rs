@@ -227,12 +227,18 @@ async fn main() {
             }
         }
         Some(Commands::Auto) => {
-            println!("🧠 [Anticipation Engine]: Analyzing patterns...");
+            println!("🧠 [Autonomy Engine]: Analyzing patterns & generating proposal...");
             match AppConfig::load() {
                 Ok(config) => {
+                    let state = openspore_core::state::AppState::new(config.clone());
                     let brain = Brain::new(config);
-                    let response = brain.think("Review my recent context and suggest one proactive action I should take.").await;
-                    println!("\n{}", response);
+                    let memory = openspore_memory::MemorySystem::new(&state);
+
+                    match openspore_autonomy::AutonomyEngine::run(&brain, &memory).await {
+                        Ok(Some(path)) => println!("\n✅ Proposal created at: {}", path.display()),
+                        Ok(None) => println!("\n⏸️ No new proposal deemed necessary at this time."),
+                        Err(e) => error!("Autonomy Engine failed: {}", e),
+                    }
                 }
                 Err(e) => error!("Failed to load config: {}", e),
             }

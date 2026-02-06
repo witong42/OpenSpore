@@ -30,7 +30,7 @@ impl Skill for DiffPatchSkill {
         let path = Path::new(&path_str);
 
         let joined_patch = parts[1..].join(separator);
-        let patch_text = joined_patch.trim();
+        let patch_text = crate::utils::unescape(joined_patch.trim());
 
         if !path.exists() {
             return Err(format!("File not found: {}", path.display()));
@@ -40,7 +40,7 @@ impl Skill for DiffPatchSkill {
             .await
             .map_err(|e| format!("Failed to read file: {}", e))?;
 
-        let patch = Patch::from_str(patch_text)
+        let patch = Patch::from_str(&patch_text)
             .map_err(|e| format!("Invalid patch format: {}", e))?;
 
         match diffy::apply(&old_content, &patch) {
