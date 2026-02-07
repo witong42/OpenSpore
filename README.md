@@ -13,6 +13,8 @@
 > [!CAUTION]
 > **OpenSpore is a powerful, autonomous AI agent with full read/write access to your system.** It is capable of executing shell commands, modifying files, and performing complex actions without manual approval for every step. Use it in a secure, isolated environment if possible, and monitor its activity closely.
 
+</div>
+
 ---
 
 ## 📖 Overview
