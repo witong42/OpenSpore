@@ -154,7 +154,7 @@ async fn main() {
                     if let Ok(content) = std::fs::read_to_string(&manifest) {
                         if let Ok(jobs) = serde_json::from_str::<serde_json::Value>(&content) {
                             if let Some(obj) = jobs.as_object() {
-                                let binary = format!("{}/substrate/target/release/openspore", app_dir);
+                                let binary = format!("{}/crates/target/release/openspore", app_dir);
                                 let mut cron_lines = Vec::new();
 
                                 if let Ok(output) = Command::new("crontab").arg("-l").output() {

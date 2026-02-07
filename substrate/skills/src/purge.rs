@@ -1,5 +1,5 @@
 //! Purge Skill (Core)
-//! Cleans up old logs and raw context to keep the substrate slim.
+//! Cleans up old logs and raw context to keep the engine slim.
 
 use super::Skill;
 use async_trait::async_trait;

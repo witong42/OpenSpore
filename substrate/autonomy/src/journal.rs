@@ -114,7 +114,7 @@ Look at the style of "2026-02-02.md":
   ## 🍄 Daily Summary (A brief narrative of the day's vibe and major focus)
   ## 🛠️ System Improvements (What technical fixes or new skills were added?)
   ## ✅ Accomplishments (List of key milestones hit)
-  ## 💭 Insights & Learning (What patterns did we notice about the substrate or the user?)
+  ## 💭 Insights & Learning (What patterns did we notice about the engine or the user?)
   ## 🏎️ Performance Metrics (Summary of latency or efficiency observations)
   ## 🎯 Tomorrow's Focus (What is the highest-leverage task to tackle next?)
 </OUTPUT_FORMAT_STYLE>

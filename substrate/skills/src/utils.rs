@@ -48,3 +48,46 @@ pub fn sanitize_path(raw: &str) -> String {
     let trimmed = raw.trim().trim_matches('"').trim_matches('\'').trim();
     openspore_core::path_utils::expand_tilde(trimmed)
 }
+
+/// Check if global safe mode is enabled via environment variable
+pub fn is_safe_mode_active() -> bool {
+    std::env::var("SAFE_MODE_ENABLED")
+        .map(|v| v.to_lowercase() == "true")
+        .unwrap_or(false)
+}
+
+/// Check if a path is considered part of the "protected engine" (core logic/config)
+pub fn is_path_protected(path_str: &str) -> bool {
+    let root = openspore_core::path_utils::get_app_root();
+    let root_str = root.to_string_lossy();
+
+    // Sanitize and ensure absolute
+    let path = std::path::Path::new(path_str);
+    let abs_path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        root.join(path)
+    };
+    let abs_str = abs_path.to_string_lossy();
+
+    // Protection Rules:
+    // 1. Block anything inside the 'crates' directory (engine logic)
+    if abs_str.contains(&format!("{}/crates", root_str)) {
+        return true;
+    }
+
+    // 2. Block top-level configuration and installer files
+    let protected_files = [".env", "Cargo.toml", "Cargo.lock", "install.sh", "README.md"];
+    for file in protected_files {
+        if abs_str == format!("{}/{}", root_str, file) {
+            return true;
+        }
+    }
+
+    // 3. Block the 'skills' directory (where core skills and plugins live)
+    if abs_str.contains(&format!("{}/skills", root_str)) {
+        return true;
+    }
+
+    false
+}

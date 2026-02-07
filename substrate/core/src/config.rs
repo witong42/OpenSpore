@@ -18,11 +18,8 @@ pub struct AppConfig {
     #[serde(alias = "OPENROUTER_MODEL")]
     pub model: Option<String>,
 
-    #[serde(alias = "OPENROUTER_MODEL_FAST")]
-    pub model_fast: Option<String>,
-
-    #[serde(alias = "OPENROUTER_MODEL_REASONING")]
-    pub model_reasoning: Option<String>,
+    #[serde(alias = "SAFE_MODE_ENABLED")]
+    pub safe_mode_enabled: bool,
 
     #[serde(skip)]
     pub project_root: std::path::PathBuf,
@@ -42,6 +39,7 @@ impl AppConfig {
 
         let builder = Config::builder()
             .set_default("autonomy_enabled", false)?
+            .set_default("safe_mode_enabled", false)?
             .add_source(File::with_name("openspore").required(false))
             .add_source(Environment::default());
 

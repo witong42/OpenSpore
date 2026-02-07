@@ -60,6 +60,15 @@ impl Skill for EditFileSkill {
             return Ok(res.to_string());
         }
 
+        // SAFE MODE CHECK
+        if crate::utils::is_safe_mode_active() && crate::utils::is_path_protected(&path) {
+            let res = serde_json::json!({
+                "success": false,
+                "error": "SAFE_MODE_ENABLED: Modifying the crates (logic) is forbidden."
+            });
+            return Ok(res.to_string());
+        }
+
         let content = match fs::read_to_string(&path).await {
             Ok(c) => c,
             Err(e) => {

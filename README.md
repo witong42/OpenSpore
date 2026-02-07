@@ -1,14 +1,14 @@
 <div align="center">
 
-# OpenSpore v1.1.2
+# OpenSpore v1.1.3
 
-**The Autonomous AI Agent Substrate**
+**The Autonomous AI Agent Ecosystem**
 
 [![Rust](https://img.shields.io/badge/built_with-Rust-dca282.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.2-green.svg)]()
+[![Version](https://img.shields.io/badge/version-1.1.3-green.svg)]()
 
-*Architectural Sovereignty • Substrate Integrity • Recursive Intelligence*
+*Architectural Sovereignty • System Integrity • Recursive Intelligence*
 
 > [!CAUTION]
 > **OpenSpore is a powerful, autonomous AI agent with full read/write access to your system.** It is capable of executing shell commands, modifying files, and performing complex actions without manual approval for every step. Use it in a secure, isolated environment if possible, and monitor its activity closely.
@@ -19,15 +19,15 @@
 
 ## 📖 Overview
 
-**OpenSpore** is a high-performance, autonomous AI agent substrate built in Rust. It is designed to be a "living" system that operates continuously, managing its own memory, executing complex multi-step tasks, and orchestrating a **parallel swarm of specialized sub-agents**. It features a rich Terminal User Interface (TUI) for observation, and a robust "Brain" that interfaces with powerful LLMs (Anthropic Claude, Google Gemini, OpenAI GPT) via **Parallel Tool Execution**.
+**OpenSpore** is a high-performance, autonomous AI agent engine ecosystem built in Rust. It is designed to be a "living" system that operates continuously, managing its own memory, executing complex multi-step tasks, and orchestrating a **parallel swarm of specialized sub-agents**. It features a rich Terminal User Interface (TUI) for observation, and a robust "Brain" that interfaces with powerful LLMs (Anthropic Claude, Google Gemini, OpenAI GPT) via **Parallel Tool Execution**.
 
-This release, **v1.1.2**, signals the transition from individual autonomy to **Swarm Intelligence**. It introduces hierarchical task decomposition, a process-wide concurrency limit of 6 simultaneous spores, and a negotiation-based consensus loop for autonomous proposals.
+This release, **v1.1.3**, signals the transition from individual autonomy to **Swarm Intelligence**. It introduces hierarchical task decomposition, a process-wide concurrency limit of 6 simultaneous spores, and a negotiation-based consensus loop for autonomous proposals.
 
 ## 🏗 Architecture
 
 OpenSpore is composed of several independent but interconnected crates within a workspace:
 
-### 1. **Substrate (Core)**
+### 1. **Crates (Core Engine)**
 The foundational layer providing configuration, state management, and the event bus. It ensures stability and high performance.
 
 ### 2. **Brain**
@@ -57,34 +57,32 @@ A beautiful, highly-responsive interface built with `ratatui`.
 
 ## 🚀 Installation
 
-### Quick Install
-We provide a versatile installer script:
+OpenSpore must be built from source to ensure binary compatibility and system integrity.
 
-```bash
-# default: Install pre-compiled binary (fastest)
-./install.sh
+### Prerequisites
 
-# Force compile from source (requires Rust)
-./install.sh -compile
+| Tool | Purpose | Minimum Version |
+| :--- | :--- | :--- |
+| **Rust / Cargo** | Building the engine | 1.70+ |
+| **Python 3** | Running specific skills | 3.10+ |
+| **Node.js** | Running JS-based skills | 18+ |
+| **Git** | Memory & Engine updates | Latest |
 
-# Uninstall OpenSpore
-./install.sh -uninstall
-
-# Show help
-./install.sh -help
-```
-
-### Build from Source
-If the pre-compiled binary doesn't work for your architecture (macOS/Linux), you can build from source.
-
-**Prerequisites (Linux/Ubuntu):**
+**System Dependencies (Linux/Ubuntu):**
 ```bash
 sudo apt update && sudo apt install -y pkg-config libssl-dev
 ```
 
-**Build command:**
+### Quick Install
+
+Use the provided installer script to build and link the binary:
+
 ```bash
-cargo build --release --manifest-path ./substrate/Cargo.toml
+# Build from source and install
+./install.sh
+
+# Uninstall OpenSpore
+./install.sh -uninstall
 ```
 
 ---
@@ -112,7 +110,25 @@ OPENSPORE_ROOT=.openspore
 
 # Autonomy
 AUTONOMY_ENABLED=true       # Enable/Disable background agent
+
+# Security & Stability
+SAFE_MODE_ENABLED=true       # Restrict AI from modifying its own logic (crates)
 ```
+
+---
+
+## 🛡️ Security & Safe Mode
+
+Because OpenSpore is an autonomous agent with the ability to modify files and run shell commands, it includes a **Safe Mode** to protect the integrity of the system (the crates).
+
+When `SAFE_MODE_ENABLED=true` is set in your `.env`:
+
+1. **Write Protection**: The AI is blocked from modifying files inside the `crates/` and `skills/` directories.
+2. **Config Protection**: Key files like `.env`, `Cargo.toml`, and `install.sh` are read-only for the agent.
+3. **Command Filtering**: Dangerous shell commands (e.g., `rm`, `mv`, `sed`) are filtered and blocked if they target core crates or config.
+4. **Self-Awareness**: The agent is explicitly told it is in Safe Mode through its prime directive.
+
+We recommend keeping Safe Mode **enabled** unless you are specifically instructing the agent to perform an authorized system upgrade.
 ### 2. Define Identity
 OpenSpore's "recursive intelligence" is shaped by Markdown files in `~/.openspore/workspace/identity/`.
 
@@ -162,7 +178,7 @@ OpenSpore provides a powerful CLI for management and automation.
 
 - **`openspore start`**: Launches the primary TUI interface.
 - **`openspore stop`**: Terminates all running OpenSpore background processes.
-- **`openspore doctor`**: Self-diagnosis tool to verify API keys, dependencies, and environment health.
+- **`openspore doctor`**: Self-diagnosis tool to verify API keys, dependencies, and engine health.
 - **`openspore cron [list|install]`**: Manage the system's autonomous schedules (install creates actual system crontabs).
 - **`openspore job <name>`**: Manually execute a specific job defined in the workspace cron registry.
 - **`openspore auto`**: Triggers the **Autonomy Engine** to analyze recent context and propose new tasks.
@@ -202,5 +218,5 @@ Each skill usually consists of a `SKILL.md` (definition) and associated scripts.
 ---
 
 <div align="center">
-<i>"The Spore grows. The Substrate endures."</i>
+<i>"The Spore grows. The Engine endures."</i>
 </div>

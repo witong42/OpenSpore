@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Check if the substrate directory exists
-SUBSTRATE_DIR="$HOME/.openspore"
-if [ -d "$SUBSTRATE_DIR" ]; then
-  substrate_dir_exists=true
-  substrate_dir_message="Substrate directory exists at $SUBSTRATE_DIR."
+# Check if the engine directory exists
+ENGINE_DIR="$HOME/.openspore"
+if [ -d "$ENGINE_DIR" ]; then
+  engine_dir_exists=true
+  engine_dir_message="Engine directory exists at $ENGINE_DIR."
 else
-  substrate_dir_exists=false
-  substrate_dir_message="Substrate directory does NOT exist at $SUBSTRATE_DIR!"
+  engine_dir_exists=false
+  engine_dir_message="Engine directory does NOT exist at $ENGINE_DIR!"
 fi
 
 # Check if openspore is in the PATH
@@ -20,18 +20,18 @@ else
 fi
 
 # Determine overall status
-if [ "$substrate_dir_exists" = "true" ] && [ "$openspore_in_path" = "true" ]; then
+if [ "$engine_dir_exists" = "true" ] && [ "$openspore_in_path" = "true" ]; then
   status="OK"
   message="All health checks passed."
 else
   status="ERROR"
-  message="One or more health checks failed! Substrate: $substrate_dir_message, OpenSpore: $openspore_path_message"
+  message="One or more health checks failed! Engine: $engine_dir_message, OpenSpore: $openspore_path_message"
 fi
 
 # Output JSON
 cat <<EOF
 {
-  "substrate_dir_exists": ${substrate_dir_exists},
+  "engine_dir_exists": ${engine_dir_exists},
   "openspore_in_path": ${openspore_in_path},
   "message": "${message}",
   "status": "${status}"

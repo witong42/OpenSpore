@@ -14,15 +14,15 @@ NC='\033[0m' # No Color
 
 INSTALL_DIR="$HOME/.openspore"
 BIN_DIR="/usr/local/bin"
-MODE="binary" # binary | compile
+INSTALL_DIR="$HOME/.openspore"
+BIN_DIR="/usr/local/bin"
 
 # Parse Arguments
 if [[ "$1" == "-help" || "$1" == "--help" ]]; then
     echo "Usage: ./install.sh [options]"
     echo ""
     echo "Options:"
-    echo "  (no args)   Install using pre-compiled binary (if present)"
-    echo "  -compile    Force build from source using Cargo"
+    echo "  (no args)   Build from source and install"
     echo "  -uninstall  Remove OpenSpore from system"
     echo "  -help       Show this help message"
     echo ""
@@ -58,12 +58,8 @@ if [[ "$1" == "-uninstall" ]]; then
     exit 0
 fi
 
-if [[ "$1" == "-compile" ]]; then
-    MODE="compile"
-fi
-
 echo ""
-echo -e "${CYAN}🍄 OpenSpore Installer ($MODE mode)${NC}"
+echo -e "${CYAN}🍄 OpenSpore Installer${NC}"
 echo "─────────────────────────────────"
 echo ""
 
@@ -75,10 +71,7 @@ if [ -d "$INSTALL_DIR/.git" ]; then
      echo -e "${YELLOW}📁 Using existing repo at $INSTALL_DIR${NC}"
 else
     # Verify we are in the repo to copy files from
-    if [ -f "./substrate/Cargo.toml" ]; then
-        # Running from source root
-        # Copy substrate content if needed, but usually we just link if running from source
-        # For this script we assume running FROM the repo root
+    if [ -f "./crates/Cargo.toml" ]; then
         echo -e "${YELLOW}📁 Setting up environment...${NC}"
     else
         echo -e "${RED}❌ Please run ./install.sh from the project root.${NC}"
@@ -86,32 +79,17 @@ else
     fi
 fi
 
-# 2. Install Binary
-TARGET_BINARY=""
-
-if [[ "$MODE" == "binary" ]]; then
-    if [ -f "./openspore" ]; then
-        echo -e "${GREEN}📦 Found pre-compiled binary.${NC}"
-        TARGET_BINARY="$(pwd)/openspore"
-    else
-        echo -e "${YELLOW}⚠️  Pre-compiled binary './openspore' not found.${NC}"
-        echo -e "${YELLOW}   Switching to compile mode...${NC}"
-        MODE="compile"
-    fi
+# 2. Build Binary
+# Check for Rust
+if ! command -v cargo &> /dev/null; then
+    echo -e "${RED}❌ Rust/Cargo not found.${NC}"
+    echo "Install Rust first: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+    exit 1
 fi
 
-if [[ "$MODE" == "compile" ]]; then
-    # Check for Rust
-    if ! command -v cargo &> /dev/null; then
-        echo -e "${RED}❌ Rust/Cargo not found.${NC}"
-        echo "Install Rust first: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-        exit 1
-    fi
-
-    echo -e "${YELLOW}🔨 Building release binary (this may take a minute)...${NC}"
-    cargo build --release --manifest-path "./substrate/Cargo.toml"
-    TARGET_BINARY="$(pwd)/substrate/target/release/openspore"
-fi
+echo -e "${YELLOW}🔨 Building release binary (this may take a minute)...${NC}"
+cargo build --release --manifest-path "./crates/Cargo.toml"
+TARGET_BINARY="$(pwd)/crates/target/release/openspore"
 
 # 3. Create Symlink
 echo -e "${YELLOW}🔗 Linking openspore to $BIN_DIR...${NC}"

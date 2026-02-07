@@ -24,15 +24,15 @@ impl Skill for ExecSkill {
         }
 
         // Intelligent Binary Discovery
-        let substrate_bin = project_root.join("substrate/target/release");
+        let engine_bin = project_root.join("crates/target/release");
         let path = std::env::var("PATH").unwrap_or_default();
-        let new_path = format!("{}:{}", substrate_bin.to_string_lossy(), path);
+        let new_path = format!("{}:{}", engine_bin.to_string_lossy(), path);
 
         let mut cmd_parts = sanitized_args.split_whitespace();
         let first_word = cmd_parts.next().unwrap_or("");
 
         let final_cmd = if first_word == "openspore" {
-            let local_bin = substrate_bin.join("openspore");
+            let local_bin = engine_bin.join("openspore");
             if local_bin.exists() {
                 sanitized_args.replacen("openspore", &local_bin.to_string_lossy(), 1)
             } else {
@@ -41,6 +41,19 @@ impl Skill for ExecSkill {
         } else {
             sanitized_args.to_string()
         };
+
+        // SAFE MODE CHECK (EXEC)
+        if crate::utils::is_safe_mode_active() {
+            let forbidden_keywords = ["rm ", "mv ", "sed ", "cargo build", "git checkout", "git reset", "git clean", "chmod ", "chown "];
+            let lower_cmd = final_cmd.to_lowercase();
+            if forbidden_keywords.iter().any(|kw| lower_cmd.contains(kw)) {
+                 let res = serde_json::json!({
+                    "success": false,
+                    "error": "SAFE_MODE_ENABLED: This command is blocked because it potentially modifies the crates (logic)."
+                });
+                return Ok(serde_json::to_string_pretty(&res).unwrap_or_default());
+            }
+        }
 
         let mut cmd = Command::new("sh");
         cmd.arg("-c")

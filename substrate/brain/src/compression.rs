@@ -30,7 +30,7 @@ Return only the new summary text."#, current, new_items);
                      Ok(compressed)
                  },
                  Err(e) => {
-                    warn!("Context compression failed: {}. Falling back to existing summary to prevent substrate bloat.", e);
+                    warn!("Context compression failed: {}. Falling back to existing summary to prevent system bloat.", e);
                     Ok(current.to_string())
                  }
              }

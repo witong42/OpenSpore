@@ -1,6 +1,4 @@
-//! SPORE DOCTOR
-//! The central diagnostic and repair utility for OpenSpore.
-//! Consolidates integrity checks, permission fixes, and substrate recovery.
+//! Consolidates integrity checks, permission fixes, and engine recovery.
 //! Exact port of opensporejs/src/utils/doctor.js
 
 use std::path::PathBuf;
@@ -58,7 +56,7 @@ impl SporeDoctor {
         self.check_structure();
         self.check_permissions();
         self.check_cron();
-        self.check_substrate();
+        self.check_engine();
 
         if self.issues.is_empty() {
             log("\n✅ SYSTEM OPTIMAL: No issues detected.", "green");
@@ -162,7 +160,7 @@ impl SporeDoctor {
         {
             use std::os::unix::fs::PermissionsExt;
 
-            let binary = self.root.join("substrate/target/release/openspore");
+            let binary = self.root.join("crates/target/release/openspore");
             if binary.exists() {
                 if let Ok(meta) = std::fs::metadata(&binary) {
                     let mode = meta.permissions().mode();
@@ -211,13 +209,13 @@ impl SporeDoctor {
         }
     }
 
-    fn check_substrate(&mut self) {
+    fn check_engine(&mut self) {
         // Check if Rust binary exists
-        let binary = self.root.join("substrate/target/release/openspore");
+        let binary = self.root.join("crates/target/release/openspore");
         if binary.exists() {
             log("✅ Rust binary found (release)", "green");
         } else {
-            let debug_binary = self.root.join("substrate/target/debug/openspore");
+            let debug_binary = self.root.join("crates/target/debug/openspore");
             if debug_binary.exists() {
                 log("⚠️ Only debug binary found (run: cargo build --release)", "yellow");
             } else {
@@ -259,9 +257,9 @@ impl SporeDoctor {
                     if let Some(file) = &issue.meta {
                         let path = self.root.join(file);
 
-                        // Try to find template in substrate/core/identity template
+                        // Try to find template in crates/core/identity template
                         let filename = path.file_name().and_then(|f| f.to_str()).unwrap_or("");
-                        let template_path = self.root.join("substrate/core/identity template").join(filename);
+                        let template_path = self.root.join("crates/core/identity template").join(filename);
 
                         let content = if template_path.exists() {
                             std::fs::read_to_string(&template_path).unwrap_or_else(|_| {
@@ -272,7 +270,7 @@ impl SporeDoctor {
                         } else if file.contains("LOGS.md") {
                             "# System Logs\n\nInitialized by Doctor.\n".to_string()
                         } else {
-                            format!("# {}\nInitial substrate established by Doctor.", filename)
+                            format!("# {}\nInitial engine established by Doctor.", filename)
                         };
 
                         // Create parent directory if needed
@@ -297,7 +295,7 @@ impl SporeDoctor {
                     log("   👉 Run 'openspore cron install' to set up cron jobs", "magenta");
                 }
                 "NO_BINARY" => {
-                    log("   👉 Run 'cargo build --release' in substrate/", "magenta");
+                    log("   👉 Run 'cargo build --release' in crates/", "magenta");
                 }
                 "MISSING_ENV" => {
                     // Create .env from example if possible

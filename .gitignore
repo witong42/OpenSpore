@@ -1,4 +1,4 @@
-# --- OpenSpore Substrate Gitignore ---
+# --- OpenSpore Gitignore ---
 
 # Build Artifacts
 **/target/

@@ -43,6 +43,15 @@ impl Skill for WriteFileSkill {
             return Ok(res.to_string());
         }
 
+        // SAFE MODE CHECK
+        if crate::utils::is_safe_mode_active() && crate::utils::is_path_protected(&path) {
+            let res = serde_json::json!({
+                "success": false,
+                "error": "SAFE_MODE_ENABLED: Modifying the crates (logic) is forbidden."
+            });
+            return Ok(res.to_string());
+        }
+
         if let Some(parent) = Path::new(&path).parent() {
             fs::create_dir_all(parent).await.ok();
         }

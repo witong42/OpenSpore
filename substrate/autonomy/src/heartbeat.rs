@@ -39,14 +39,14 @@ impl Heartbeat {
             logs.push("📝 Journal: Pending (22:00)".to_string());
         }
 
-        // 3. Substrate Integrity
+        // 3. Engine Integrity
         let mut doctor = openspore_doctor::SporeDoctor::new();
         let doctor_ok = doctor.check_all();
 
         if doctor_ok {
-            logs.push("📁 Substrate: Healthy (Doctor Verified)".to_string());
+            logs.push("📁 Engine: Healthy (Doctor Verified)".to_string());
         } else {
-            logs.push("🩹 Substrate: Issues found & treated by Doctor".to_string());
+            logs.push("🩹 Engine: Issues found & treated by Doctor".to_string());
             status = "🟡 CAUTION";
         }
 

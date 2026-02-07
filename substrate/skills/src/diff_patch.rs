@@ -31,6 +31,16 @@ impl Skill for DiffPatchSkill {
 
         let raw_path = parts[0].trim().trim_matches('"').trim_matches('\'').trim();
         let path_str = openspore_core::path_utils::expand_tilde(raw_path);
+
+        // SAFE MODE CHECK
+        if crate::utils::is_safe_mode_active() && crate::utils::is_path_protected(&path_str) {
+            let res = serde_json::json!({
+                "success": false,
+                "error": "SAFE_MODE_ENABLED: Modifying the crates (logic) is forbidden."
+            });
+            return Ok(res.to_string());
+        }
+
         let path = Path::new(&path_str);
 
         let joined_patch = parts[1..].join(separator);
