@@ -1,15 +1,13 @@
-//! OpenSpore Swarm - Orchestration and Sub-Agent Lifecycle
-//!
-//! This crate manages the lifecycle of delegated spores,
-//! provides discovery of active processes, and handles
-//! information flow between the swarm members.
-
 use std::path::PathBuf;
 use tokio::process::Command;
 use tracing::info;
 use anyhow::Result;
 use std::time::Duration;
 use tokio::time::timeout;
+use tokio::sync::Semaphore;
+use once_cell::sync::Lazy;
+
+static SWARM_SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(6));
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SporeInfo {
@@ -32,6 +30,9 @@ impl SwarmManager {
 
     /// Spawn a new sub-spore (delegation)
     pub async fn spawn(&self, task: &str, role: &str) -> Result<String> {
+        info!("🐝 Swarm: Waiting for permit to spawn sub-spore (Role: {})", role);
+        let _permit = SWARM_SEMAPHORE.acquire().await?;
+
         info!("🐝 Swarm: Spawning sub-spore (Role: {}) for task: {}", role, task);
 
         let child = Command::new(&self.binary_path)
@@ -43,8 +44,8 @@ impl SwarmManager {
             .stderr(std::process::Stdio::piped())
             .spawn()?;
 
-        // 10 minute timeout for sub-spores
-        match timeout(Duration::from_secs(600), child.wait_with_output()).await {
+        // 3 minute timeout for sub-spores
+        match timeout(Duration::from_secs(180), child.wait_with_output()).await {
             Ok(Ok(output)) => {
                 let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 if output.status.success() {

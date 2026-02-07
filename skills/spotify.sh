@@ -11,6 +11,10 @@ play_song() {
 
   echo "🔎 Searching and playing: '$query'..."
 
+
+  open -a "Spotify"
+  sleep 2.0
+
   # User confirmed sequence:
   # Cmd+L -> Type -> Enter (Search) -> Tab -> Tab -> Enter -> Enter (Play)
   osascript <<EOF

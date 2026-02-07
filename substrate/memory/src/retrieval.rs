@@ -1,7 +1,9 @@
 use crate::{MemorySystem, types::{MemoryItem, SearchResult}};
 use walkdir::WalkDir;
-use anyhow::Result;
+use anyhow::{Result, Context};
 use std::path::Path;
+use chrono::{DateTime, Local, Duration, NaiveDateTime, TimeZone};
+use std::fs;
 
 impl MemorySystem {
     /// Get all memories from a category (lines 211-228 in JS)
@@ -16,10 +18,16 @@ impl MemorySystem {
         if let Ok(entries) = std::fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
+                // Filter out special files
+                let filename = path.file_name().unwrap_or_default().to_string_lossy();
+                if filename == "LOGS.md" || filename == "session_summary.md" {
+                    continue;
+                }
+
                 if path.extension().map(|e| e == "md").unwrap_or(false) {
                     if let Ok(content) = std::fs::read_to_string(&path) {
                         memories.push(MemoryItem {
-                            filename: path.file_name().unwrap().to_string_lossy().to_string(),
+                            filename: filename.to_string(),
                             content,
                         });
                     }
@@ -30,6 +38,48 @@ impl MemorySystem {
         // Sort by filename to ensure chronological order (for Exchange_TIMESTAMP.md)
         memories.sort_by(|a, b| a.filename.cmp(&b.filename));
         memories
+    }
+
+    /// Retrieve raw logs from the last N hours
+    pub fn get_recent_logs(&self, hours: i64) -> Result<String> {
+        let cutoff = Local::now() - Duration::hours(hours);
+        self.get_logs_since(cutoff)
+    }
+
+    /// Retrieve raw logs since a specific timestamp
+    pub fn get_logs_since(&self, cutoff: DateTime<Local>) -> Result<String> {
+        let logs_path = self.memory_root.join("context").join("LOGS.md");
+        if !logs_path.exists() {
+            return Ok(String::from("No log file found."));
+        }
+
+        let content = fs::read_to_string(&logs_path)
+            .context("Failed to read LOGS.md")?;
+
+        // Regex to match [YYYY-MM-DD HH:MM:SS]
+        let re = regex::Regex::new(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]")?;
+
+        let mut relevant_lines = Vec::new();
+        let lines: Vec<&str> = content.lines().collect();
+
+        let mut is_recent = false;
+
+        for line in lines {
+            if let Some(caps) = re.captures(line) {
+                if let Ok(ts_naive) = NaiveDateTime::parse_from_str(&caps[1], "%Y-%m-%d %H:%M:%S") {
+                    let ts: DateTime<Local> = Local.from_local_datetime(&ts_naive).single()
+                        .unwrap_or_else(|| Local::now()); // Fallback on ambiguity
+
+                    is_recent = ts >= cutoff;
+                }
+            }
+
+            if is_recent {
+                relevant_lines.push(line);
+            }
+        }
+
+        Ok(relevant_lines.join("\n"))
     }
 
     /// Wrapper for semantic search (placeholdered by keyword search for now)

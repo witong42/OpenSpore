@@ -1,12 +1,12 @@
 <div align="center">
 
-# OpenSpore v1.0.1
+# OpenSpore v1.1.2
 
 **The Autonomous AI Agent Substrate**
 
 [![Rust](https://img.shields.io/badge/built_with-Rust-dca282.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.1-green.svg)]()
+[![Version](https://img.shields.io/badge/version-1.1.2-green.svg)]()
 
 *Architectural Sovereignty • Substrate Integrity • Recursive Intelligence*
 
@@ -19,9 +19,9 @@
 
 ## 📖 Overview
 
-**OpenSpore** is a high-performance, autonomous AI agent substrate built in Rust. It is designed to be a "living" system that operates continuously, managing its own memory, executing complex multi-step tasks, and creating "sub-spores" (autonomous sub-agents) to delegate work. It features a rich Terminal User Interface (TUI) for interaction and observation, and a robust "Brain" that interfaces with powerful LLMs (Anthropic Claude, Google Gemini, OpenAI GPT).
+**OpenSpore** is a high-performance, autonomous AI agent substrate built in Rust. It is designed to be a "living" system that operates continuously, managing its own memory, executing complex multi-step tasks, and orchestrating a **parallel swarm of specialized sub-agents**. It features a rich Terminal User Interface (TUI) for observation, and a robust "Brain" that interfaces with powerful LLMs (Anthropic Claude, Google Gemini, OpenAI GPT) via **Parallel Tool Execution**.
 
-This release, **v1.0.1**, marks the first stable milestone of the OpenSpore ecosystem.
+This release, **v1.1.2**, signals the transition from individual autonomy to **Swarm Intelligence**. It introduces hierarchical task decomposition, a process-wide concurrency limit of 6 simultaneous spores, and a negotiation-based consensus loop for autonomous proposals.
 
 ## 🏗 Architecture
 
@@ -33,13 +33,14 @@ The foundational layer providing configuration, state management, and the event 
 ### 2. **Brain**
 The cognitive center. It handles:
 - **LLM Interface:** Connects to AI models via unified APIs.
-- **Thinking Process:** A recursive, stream-of-thought engine that allows the agent to "reason" before acting.
-- **Context Assembly:** Dynamically gathering relevant files and memory for each prompts.
+- **Chain-of-Thought (CoT):** A recursive reasoning engine where agents explain their logic before acting.
+- **Parallel Tool Execution:** The ability to execute multiple tools (including delegation) simultaneously in a single turn.
 
 ### 3. **Swarm**
-The agentic capability system.
-- **Spore Delegation:** The ability to spawn independent sub-agents ("Spores") to handle specific tasks (e.g., "Research this library", "Audit this file").
-- **Task Management:** Asynchronous execution and result synthesis.
+The autonomous orchestration system.
+- **Hierarchical Task Decomposition:** The `AutonomyEngine` acts as a **Planner**, breaking complex goals into specialized `AtomicTasks`.
+- **Negotiation & Consensus:** Prototypical "Reviewer" spores audit proposals to ensure safety and value through a consensus loop.
+- **Parallel Delegation:** Support for up to **6 simultaneous sub-spores** with unified **concurrency control** and a 3-minute timeout.
 
 ### 4. **Memory**
 A persistent context system.

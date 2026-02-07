@@ -6,8 +6,8 @@ OpenSpore operates as a high-performance **Manager-Worker Swarm** written in Rus
 - **Delegation Protocol**:
     1. Delegation is performed via the **`delegate` skill**.
     2. Sub-spores are spawned for tasks requiring specialized reasoning or parallel execution.
-    3. Roles: `RESEARCHER`, `EXECUTOR`, `REASONER`, `PLANNER`.
-    4. Sub-spores have a standard **10-minute timeout** for termination.
+    3. **Concurrency**: Up to **6 simultaneous sub-spores** can be spawned in a single turn. The Manager Spore can call `[DELEGATE]` multiple times in one thought layer to trigger parallel execution.
+    5. Sub-spores have a standard **3-minute timeout** for termination.
 
 ## 💓 [HEARTBEAT] (Pulse)
 - **Interval**: 2 hours. (rust native)
