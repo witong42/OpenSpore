@@ -14,6 +14,7 @@ mod learning;
 mod compression;
 mod context_assembler;
 mod parser;
+pub mod events;
 
 use serde::{Deserialize, Serialize};
 
@@ -58,5 +59,14 @@ impl Brain {
 
     pub fn clone_brain(&self) -> Self {
         self.clone()
+    }
+
+    /// think() with an observer channel for real-time updates
+    pub async fn think_with_observer(&self, user_prompt: &str, tx: Option<tokio::sync::mpsc::Sender<events::BrainEvent>>) -> String {
+        self.think_internal(user_prompt, tx).await
+    }
+
+    pub async fn think(&self, user_prompt: &str) -> String {
+        self.think_internal(user_prompt, None).await
     }
 }

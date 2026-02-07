@@ -41,3 +41,10 @@ pub fn unescape(s: &str) -> String {
     }
     result
 }
+
+/// Centralized path/string sanitization for all skills.
+/// Trims quotes, expands tildes, and removes unneccessary whitespace.
+pub fn sanitize_path(raw: &str) -> String {
+    let trimmed = raw.trim().trim_matches('"').trim_matches('\'').trim();
+    openspore_core::path_utils::expand_tilde(trimmed)
+}

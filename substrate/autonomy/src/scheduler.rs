@@ -13,8 +13,16 @@ impl SporeScheduler {
     pub async fn start(brain: Brain, memory: MemorySystem, telegram: Option<TelegramChannel>) {
         info!("🕒 Spore Scheduler: Background engine spinning up...");
 
-        let mut last_heartbeat = std::time::Instant::now(); // Wait for the first interval
-        let mut last_journal_day = String::new();
+        let mut last_heartbeat = std::time::Instant::now();
+
+        let now = chrono::Local::now();
+        let today = now.format("%Y-%m-%d").to_string();
+        // If we start during the journal hour (22:00), don't trigger immediately
+        let mut last_journal_day = if now.hour() >= 22 {
+            today
+        } else {
+            String::new()
+        };
 
         loop {
             let now = chrono::Local::now();

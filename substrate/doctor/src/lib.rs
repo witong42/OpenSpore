@@ -5,6 +5,7 @@
 
 use std::path::PathBuf;
 use std::process::Command;
+use tracing::info;
 
 /// Issue severity levels
 #[derive(Debug, Clone)]
@@ -24,18 +25,9 @@ pub struct Issue {
 }
 
 /// Colored terminal output
-fn log(msg: &str, color: &str) {
-    let code = match color {
-        "red" => "\x1b[31m",
-        "green" => "\x1b[32m",
-        "yellow" => "\x1b[33m",
-        "blue" => "\x1b[34m",
-        "magenta" => "\x1b[35m",
-        "cyan" => "\x1b[36m",
-        "gray" => "\x1b[90m",
-        _ => "\x1b[37m",
-    };
-    println!("{}{}\x1b[0m", code, msg);
+/// Log wrapper (now using tracing)
+fn log(msg: &str, _color: &str) {
+    info!("{}", msg);
 }
 
 /// SporeDoctor - diagnostic and repair utility
@@ -48,8 +40,7 @@ pub struct SporeDoctor {
 
 impl SporeDoctor {
     pub fn new() -> Self {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        let root = PathBuf::from(format!("{}/.openspore", home));
+        let root = openspore_core::path_utils::get_app_root();
         let workspace = root.join("workspace");
 
         Self {

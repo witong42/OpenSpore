@@ -14,7 +14,7 @@ impl Skill for DiffPatchSkill {
     fn name(&self) -> &'static str { "diff_patch" }
 
     fn description(&self) -> &'static str {
-        "Apply a GNU-style diff/patch to a file. Usage: [DIFF_PATCH: \"/path/to/file|||patch_text\"]"
+        "Apply a GNU-style diff/patch to a file. Returns JSON with success, message, and path. Usage: [DIFF_PATCH: \"/path/to/file|||patch_text\"]"
     }
 
     async fn execute(&self, args: &str) -> Result<String, String> {
@@ -22,7 +22,11 @@ impl Skill for DiffPatchSkill {
         let parts: Vec<&str> = args.split(separator).collect();
 
         if parts.len() < 2 {
-            return Err("Usage: [DIFF_PATCH: \"/path/to/file|||patch_text\"]".to_string());
+            let res = serde_json::json!({
+                "success": false,
+                "error": "Usage: [DIFF_PATCH: \"/path/to/file|||patch_text\"]"
+            });
+            return Ok(res.to_string());
         }
 
         let raw_path = parts[0].trim().trim_matches('"').trim_matches('\'').trim();
@@ -30,28 +34,70 @@ impl Skill for DiffPatchSkill {
         let path = Path::new(&path_str);
 
         let joined_patch = parts[1..].join(separator);
-        let patch_text = crate::utils::unescape(joined_patch.trim());
+        let mut patch_text = crate::utils::unescape(joined_patch.trim());
 
-        if !path.exists() {
-            return Err(format!("File not found: {}", path.display()));
+        // Sanitize: Remove Markdown code blocks if present
+        if patch_text.starts_with("```") {
+            let lines: Vec<&str> = patch_text.lines().collect();
+            if lines.len() >= 2 {
+                // remove first and last line if they look like markers
+                let start = if lines[0].starts_with("```") { 1 } else { 0 };
+                let end = if lines.last().unwrap_or(&"").starts_with("```") { lines.len() - 1 } else { lines.len() };
+                patch_text = lines[start..end].join("\n");
+            }
+        }
+        patch_text = patch_text.trim().to_string();
+
+        // Ensure trailing newline for strict diff parsers
+        if !patch_text.ends_with('\n') {
+            patch_text.push('\n');
         }
 
-        let old_content = fs::read_to_string(path)
-            .await
-            .map_err(|e| format!("Failed to read file: {}", e))?;
+        if !path.exists() {
+            let res = serde_json::json!({
+                "success": false,
+                "error": format!("File not found: {}", path_str),
+                "path": path_str
+            });
+            return Ok(res.to_string());
+        }
 
-        let patch = Patch::from_str(&patch_text)
-            .map_err(|e| format!("Invalid patch format: {}", e))?;
+        let old_content = match fs::read_to_string(path).await {
+            Ok(c) => c,
+            Err(e) => {
+                let res = serde_json::json!({ "success": false, "error": format!("Failed to read file: {}", e), "path": path_str });
+                return Ok(res.to_string());
+            }
+        };
+
+        let patch = match Patch::from_str(&patch_text) {
+            Ok(p) => p,
+            Err(e) => {
+                let res = serde_json::json!({ "success": false, "error": format!("Invalid patch format: {}", e), "path": path_str });
+                return Ok(res.to_string());
+            }
+        };
 
         match diffy::apply(&old_content, &patch) {
             Ok(new_content) => {
-                fs::write(path, new_content)
-                    .await
-                    .map_err(|e| format!("Failed to write patched file: {}", e))?;
-                Ok(format!("✅ Successfully patched {}", path.display()))
+                if let Err(e) = fs::write(path, new_content).await {
+                    let res = serde_json::json!({ "success": false, "error": format!("Failed to write patched file: {}", e), "path": path_str });
+                    return Ok(res.to_string());
+                }
+                let res = serde_json::json!({
+                    "success": true,
+                    "message": format!("Successfully patched {}", path_str),
+                    "path": path_str
+                });
+                Ok(res.to_string())
             },
             Err(e) => {
-                Err(format!("❌ Failed to apply patch: {:?}", e))
+                let res = serde_json::json!({
+                    "success": false,
+                    "error": format!("Failed to apply patch: {:?}", e),
+                    "path": path_str
+                });
+                Ok(res.to_string())
             }
         }
     }

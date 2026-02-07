@@ -10,7 +10,7 @@ impl Skill for DelegateSkill {
     fn name(&self) -> &'static str { "delegate" }
 
     fn description(&self) -> &'static str {
-        "Spawn a specialized sub-spore for parallel task execution. Usage: [DELEGATE: \"task description\" --role=\"ExpertRole\"]"
+        "Spawn a specialized sub-spore for parallel task execution. Returns JSON with success and result. Usage: [DELEGATE: \"task description\" --role=\"ExpertRole\"]"
     }
 
     async fn execute(&self, args: &str) -> Result<String, String> {
@@ -21,14 +21,21 @@ impl Skill for DelegateSkill {
         let swarm = openspore_swarm::SwarmManager::new();
 
         match swarm.spawn(task, role).await {
-            Ok(result) => {
-                Ok(format!(
-                    "\n--- 🤖 Agent Delegate (Role: {}) ---\n{}\n-----------------------------------\n",
-                    role, result
-                ))
+            Ok(execution_result) => {
+                let res = serde_json::json!({
+                    "success": true,
+                    "role": role,
+                    "result": execution_result
+                });
+                Ok(res.to_string())
             }
             Err(e) => {
-                Err(format!("Delegation Failed: {}", e))
+                let res = serde_json::json!({
+                    "success": false,
+                    "error": format!("Delegation Failed: {}", e),
+                    "role": role
+                });
+                Ok(res.to_string())
             }
         }
     }

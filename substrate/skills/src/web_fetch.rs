@@ -11,29 +11,53 @@ impl Skill for WebFetchSkill {
     fn name(&self) -> &'static str { "web_fetch" }
 
     fn description(&self) -> &'static str {
-        "Fetch content from a URL. Usage: [WEB_FETCH: \"https://example.com\"]"
+        "Fetch content from a URL. Returns JSON with success, status_code, and content. Usage: [WEB_FETCH: \"https://example.com\"]"
     }
 
     async fn execute(&self, args: &str) -> Result<String, String> {
         let url = args.trim().trim_matches('"').trim_matches('\'');
 
         let client = Client::new();
-        let response = client.get(url)
-            .send()
-            .await
-            .map_err(|e| format!("Request failed: {}", e))?;
+        match client.get(url).send().await {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                match response.text().await {
+                    Ok(body) => {
+                        let full_length = body.len();
+                        let truncated = if full_length > 10000 {
+                            format!("{}...\n[Truncated {} bytes]", &body[..10000], full_length - 10000)
+                        } else {
+                            body
+                        };
 
-        let status = response.status();
-        let body = response.text()
-            .await
-            .map_err(|e| format!("Failed to read body: {}", e))?;
-
-        let truncated = if body.len() > 5000 {
-            format!("{}...\n[Truncated {} bytes]", &body[..5000], body.len() - 5000)
-        } else {
-            body
-        };
-
-        Ok(format!("Status: {}\n\n{}", status, truncated))
+                        let res = serde_json::json!({
+                            "success": true,
+                            "status_code": status,
+                            "content": truncated,
+                            "full_length": full_length,
+                            "url": url
+                        });
+                        Ok(res.to_string())
+                    },
+                    Err(e) => {
+                        let res = serde_json::json!({
+                            "success": false,
+                            "error": format!("Failed to read body: {}", e),
+                            "status_code": status,
+                            "url": url
+                        });
+                        Ok(res.to_string())
+                    }
+                }
+            },
+            Err(e) => {
+                let res = serde_json::json!({
+                    "success": false,
+                    "error": format!("Request failed: {}", e),
+                    "url": url
+                });
+                Ok(res.to_string())
+            }
+        }
     }
 }

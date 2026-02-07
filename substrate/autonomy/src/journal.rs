@@ -55,8 +55,8 @@ impl DailyJournal {
             info!("✅ Journal created at {}", journal_path.display());
         }
 
-        // 3. Archive & Cleanup
-        Self::archive_interactions(memory, &today_str, &interactions)?;
+        // 3. Cleanup
+        Self::delete_interactions(&interactions)?;
         Self::clear_active_logs(memory)?;
 
         Ok(Some(journal_path))
@@ -128,27 +128,13 @@ Rules:
         brain.think(&prompt).await
     }
 
-    fn archive_interactions(memory: &MemorySystem, today_str: &str, interactions: &[PathBuf]) -> Result<()> {
-        let context_dir = memory.project_root.join("workspace/context");
-        let archive_dir = context_dir.join("archive").join(today_str);
-
-        if !archive_dir.exists() {
-            fs::create_dir_all(&archive_dir)?;
-        }
-
+    fn delete_interactions(interactions: &[PathBuf]) -> Result<()> {
         for path in interactions {
-            if let Some(name) = path.file_name() {
-                let dest = archive_dir.join(name);
-                if let Err(e) = fs::rename(path, &dest) {
-                    if fs::copy(path, &dest).is_ok() {
-                        let _ = fs::remove_file(path);
-                    } else {
-                        tracing::error!("Failed to archive {}: {}", path.display(), e);
-                    }
-                }
+            if path.exists() {
+                let _ = fs::remove_file(path);
             }
         }
-        info!("📦 Archived {} exchanges to {}", interactions.len(), archive_dir.display());
+        info!("🧹 Successfully purged {} raw exchanges after synthesis.", interactions.len());
         Ok(())
     }
 

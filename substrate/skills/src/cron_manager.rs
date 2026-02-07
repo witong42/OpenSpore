@@ -4,7 +4,6 @@
 use super::Skill;
 use async_trait::async_trait;
 use tokio::fs;
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::process::Command;
@@ -25,7 +24,7 @@ impl Skill for CronManagerSkill {
     fn name(&self) -> &'static str { "cron_manager" }
 
     fn description(&self) -> &'static str {
-        "Manage OpenSpore automation jobs. Actions: list, add, remove. Usage: [CRON_MANAGER: {\"action\": \"list\"}]"
+        "Manage OpenSpore automation jobs. Actions: list, add, remove. Returns JSON with success and results. Usage: [CRON_MANAGER: {\"action\": \"list\"}]"
     }
 
     async fn execute(&self, args: &str) -> Result<String, String> {
@@ -34,11 +33,16 @@ impl Skill for CronManagerSkill {
             sanitized = &sanitized[1..sanitized.len()-1];
         }
 
-        let params: CronParams = serde_json::from_str(sanitized)
-            .map_err(|e| format!("Invalid JSON: {}. Error: {}", sanitized, e))?;
+        let params: CronParams = match serde_json::from_str(sanitized) {
+            Ok(p) => p,
+            Err(e) => {
+                let res = serde_json::json!({ "success": false, "error": format!("Invalid JSON: {}. Error: {}", sanitized, e) });
+                return Ok(res.to_string());
+            }
+        };
 
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        let cron_dir = PathBuf::from(format!("{}/.openspore/workspace/cron", home));
+        let root = openspore_core::path_utils::get_app_root();
+        let cron_dir = root.join("workspace/cron");
         let manifest_path = cron_dir.join("crontab.json");
 
         if !cron_dir.exists() {
@@ -46,28 +50,54 @@ impl Skill for CronManagerSkill {
         }
 
         let mut manifest: Value = if manifest_path.exists() {
-            let content = fs::read_to_string(&manifest_path).await.map_err(|e| e.to_string())?;
-            serde_json::from_str(&content).unwrap_or(serde_json::json!({}))
+            match fs::read_to_string(&manifest_path).await {
+                Ok(content) => serde_json::from_str(&content).unwrap_or(serde_json::json!({})),
+                Err(_) => serde_json::json!({})
+            }
         } else {
             serde_json::json!({})
         };
 
         match params.action.as_str() {
             "list" => {
-                Ok(serde_json::to_string_pretty(&manifest).unwrap_or_default())
+                let res = serde_json::json!({
+                    "success": true,
+                    "action": "list",
+                    "jobs": manifest
+                });
+                Ok(res.to_string())
             },
             "add" => {
-                let name = params.name.ok_or("Error: 'name' is required for 'add'")?;
-                let schedule = params.schedule.ok_or("Error: 'schedule' is required for 'add'")?;
-                let content = params.script_content.ok_or("Error: 'script_content' is required for 'add'")?;
+                let name = match params.name {
+                    Some(n) => n,
+                    None => {
+                        let res = serde_json::json!({ "success": false, "error": "'name' is required for 'add'" });
+                        return Ok(res.to_string());
+                    }
+                };
+                let schedule = match params.schedule {
+                    Some(s) => s,
+                    None => {
+                        let res = serde_json::json!({ "success": false, "error": "'schedule' is required for 'add'" });
+                        return Ok(res.to_string());
+                    }
+                };
+                let content = match params.script_content {
+                    Some(c) => c,
+                    None => {
+                        let res = serde_json::json!({ "success": false, "error": "'script_content' is required for 'add'" });
+                        return Ok(res.to_string());
+                    }
+                };
 
                 let script_name = if name.ends_with(".js") { name.clone() } else { format!("{}.js", name) };
                 let script_path = cron_dir.join(&script_name);
 
-                // 1. Write script
-                fs::write(&script_path, content).await.map_err(|e| e.to_string())?;
+                if let Err(e) = fs::write(&script_path, content).await {
+                    let res = serde_json::json!({ "success": false, "error": format!("Failed to write script: {}", e) });
+                    return Ok(res.to_string());
+                }
 
-                // 2. Update manifest
                 let job = serde_json::json!({
                     "schedule": schedule,
                     "script": script_name,
@@ -75,18 +105,31 @@ impl Skill for CronManagerSkill {
                 });
                 manifest[name.clone()] = job;
 
-                fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap())
-                    .await.map_err(|e| e.to_string())?;
+                if let Err(e) = fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap()).await {
+                    let res = serde_json::json!({ "success": false, "error": format!("Failed to update manifest: {}", e) });
+                    return Ok(res.to_string());
+                }
 
-                // 3. Sync crontab
                 let _ = Command::new("openspore").arg("cron").arg("install").output().await;
 
-                Ok(format!("✅ Job '{}' added and crontab synced.", name))
+                let res = serde_json::json!({
+                    "success": true,
+                    "action": "add",
+                    "message": format!("Job '{}' added and crontab synced.", name)
+                });
+                Ok(res.to_string())
             },
             "remove" => {
-                let name = params.name.ok_or("Error: 'name' is required for 'remove'")?;
+                let name = match params.name {
+                    Some(n) => n,
+                    None => {
+                        let res = serde_json::json!({ "success": false, "error": "'name' is required for 'remove'" });
+                        return Ok(res.to_string());
+                    }
+                };
                 if manifest.get(&name).is_none() {
-                    return Err(format!("Error: Job '{}' not found.", name));
+                    let res = serde_json::json!({ "success": false, "error": format!("Job '{}' not found.", name) });
+                    return Ok(res.to_string());
                 }
 
                 if let Some(job) = manifest.get(&name) {
@@ -97,15 +140,24 @@ impl Skill for CronManagerSkill {
                 }
 
                 manifest.as_object_mut().unwrap().remove(&name);
-                fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap())
-                    .await.map_err(|e| e.to_string())?;
+                if let Err(e) = fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap()).await {
+                    let res = serde_json::json!({ "success": false, "error": format!("Failed to update manifest: {}", e) });
+                    return Ok(res.to_string());
+                }
 
-                // 3. Sync crontab
                 let _ = Command::new("openspore").arg("cron").arg("install").output().await;
 
-                Ok(format!("✅ Job '{}' removed and crontab synced.", name))
+                let res = serde_json::json!({
+                    "success": true,
+                    "action": "remove",
+                    "message": format!("Job '{}' removed and crontab synced.", name)
+                });
+                Ok(res.to_string())
             },
-            _ => Err(format!("Unknown action: {}", params.action))
+            _ => {
+                let res = serde_json::json!({ "success": false, "error": format!("Unknown action: {}", params.action) });
+                Ok(res.to_string())
+            }
         }
     }
 }

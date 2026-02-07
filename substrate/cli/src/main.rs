@@ -53,7 +53,7 @@ enum Commands {
 }
 
 fn get_app_dir() -> String {
-    std::env::var("HOME").unwrap_or_else(|_| ".".to_string()) + "/.openspore"
+    openspore_core::path_utils::get_app_root().to_string_lossy().to_string()
 }
 
 #[tokio::main]
@@ -82,7 +82,7 @@ async fn main() {
     } else {
         // CLI mode: Log to stdout for feedback
         tracing_subscriber::fmt()
-            .with_writer(std::io::stdout)
+            .with_writer(std::io::stderr)
             .with_ansi(true)
             .init();
     }
@@ -92,7 +92,7 @@ async fn main() {
     match args.command {
         Some(Commands::Start) | None => {
             // TUI Mode
-            if let Err(e) = openspore_tui::run() {
+            if let Err(e) = openspore_tui::run().await {
                 eprintln!("TUI Error: {}", e);
             }
         }

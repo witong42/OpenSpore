@@ -39,7 +39,7 @@ impl MemorySystem {
         if (target_category == "identity" || target_category == "context")
             && core_identity_files.contains(&normalized_title.as_str())
         {
-            println!("🛡️ Save Blocked: Attempt to clobber protected substrate file \"{}.md\" via save_memory.", normalized_title);
+            tracing::warn!("🛡️ Save Blocked: Attempt to clobber protected substrate file \"{}.md\" via save_memory.", normalized_title);
             return Ok(None);
         }
 

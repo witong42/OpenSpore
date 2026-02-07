@@ -26,3 +26,18 @@ pub fn expand_tilde(path: &str) -> String {
 pub fn get_path(path: &str) -> PathBuf {
     PathBuf::from(expand_tilde(path))
 }
+
+/// Robustly resolves the OpenSpore project root using OPENSPORE_ROOT env var.
+/// Handles absolute paths, tilde expansion, and relative names.
+pub fn get_app_root() -> PathBuf {
+    let root_name = std::env::var("OPENSPORE_ROOT").unwrap_or_else(|_| ".openspore".to_string());
+
+    if root_name.starts_with('/') {
+        PathBuf::from(root_name)
+    } else if root_name.starts_with('~') {
+        get_path(&root_name)
+    } else {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        PathBuf::from(home).join(root_name)
+    }
+}

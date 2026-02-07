@@ -32,14 +32,11 @@ impl AppConfig {
     pub fn load() -> Result<Self, ConfigError> {
         // 1. Try standard dotenv discovery from current dir
         if let Err(_) = dotenvy::dotenv() {
-            // 2. Fallback: Try explicitly from OPENSPORE_ROOT or ~/.openspore
-            let root_name = std::env::var("OPENSPORE_ROOT").unwrap_or_else(|_| ".openspore".to_string());
-
-            if let Ok(home) = std::env::var("HOME") {
-                let path = std::path::Path::new(&home).join(&root_name).join(".env");
-                if path.exists() {
-                     let _ = dotenvy::from_path(&path);
-                }
+            // 2. Fallback: Try explicitly from resolved OPENSPORE_ROOT
+            let root = crate::path_utils::get_app_root();
+            let path = root.join(".env");
+            if path.exists() {
+                 let _ = dotenvy::from_path(&path);
             }
         }
 
@@ -51,12 +48,7 @@ impl AppConfig {
         let mut config: Self = builder.build()?.try_deserialize()?;
 
         // Set project_root
-        let root_name = std::env::var("OPENSPORE_ROOT").unwrap_or_else(|_| ".openspore".to_string());
-        if let Ok(home) = std::env::var("HOME") {
-            config.project_root = std::path::Path::new(&home).join(&root_name);
-        } else {
-            config.project_root = std::path::PathBuf::from(".");
-        }
+        config.project_root = crate::path_utils::get_app_root();
 
         Ok(config)
     }

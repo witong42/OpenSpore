@@ -62,44 +62,44 @@ impl Skill for PluginSkill {
             .and_then(|e| e.to_str())
             .unwrap_or("");
 
-        let output = match ext {
-            "js" => {
-                Command::new("node")
-                    .arg(&self.script_path)
-                    .arg(args)
-                    .output()
-                    .await
-            }
-            "sh" => {
-                Command::new("sh")
-                    .arg(&self.script_path)
-                    .arg(args)
-                    .output()
-                    .await
-            }
-            "py" => {
-                Command::new("python3")
-                    .arg(&self.script_path)
-                    .arg(args)
-                    .output()
-                    .await
-            }
-            _ => {
-                // Try to execute directly (for binaries)
-                Command::new(&self.script_path)
-                    .arg(args)
-                    .output()
-                    .await
-            }
-        }.map_err(|e| e.to_string())?;
+        let sanitized_args = crate::utils::sanitize_path(args);
+        let script_path = self.script_path.to_string_lossy();
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
+        let full_command = match ext {
+            "js" => format!("node \"{}\" {}", script_path, sanitized_args),
+            "sh" => format!("sh \"{}\" {}", script_path, sanitized_args),
+            "py" => format!("python3 \"{}\" {}", script_path, sanitized_args),
+            _ => format!("\"{}\" {}", script_path, sanitized_args),
+        };
 
-        if output.status.success() {
-            Ok(stdout.to_string())
-        } else {
-            Err(format!("{}\n{}", stdout, stderr))
+        let output_res = Command::new("sh")
+            .arg("-c")
+            .arg(&full_command)
+            .output()
+            .await;
+
+        match output_res {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                let exit_code = output.status.code().unwrap_or(-1);
+                let success = output.status.success();
+
+                let res = serde_json::json!({
+                    "success": success,
+                    "exit_code": exit_code,
+                    "stdout": stdout,
+                    "stderr": stderr
+                });
+                Ok(res.to_string())
+            },
+            Err(e) => {
+                let res = serde_json::json!({
+                    "success": false,
+                    "error": format!("Execution failed: {}", e)
+                });
+                Ok(res.to_string())
+            }
         }
     }
 }
@@ -136,8 +136,8 @@ impl SkillLoader {
         }
 
         // Determine plugin directory
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        let plugin_dir = PathBuf::from(format!("{}/.openspore/skills", home));
+        let root = openspore_core::path_utils::get_app_root();
+        let plugin_dir = root.join("skills");
 
         let mut loader = Self { skills, plugin_dir };
         loader.load_plugins();
@@ -172,17 +172,15 @@ impl SkillLoader {
                 .unwrap_or("unknown")
                 .to_string();
 
-            // Try to read description from first line comment
+            // Try to read description from first non-shebang comment
             let description = std::fs::read_to_string(&path)
                 .ok()
                 .and_then(|content| {
-                    content.lines().next().and_then(|line| {
-                        if line.starts_with("//") || line.starts_with("#") {
-                            Some(line.trim_start_matches(['/', '#', ' ']).to_string())
-                        } else {
-                            None
-                        }
-                    })
+                    content.lines()
+                        .find(|line| {
+                            (line.starts_with("//") || line.starts_with("#")) && !line.starts_with("#!")
+                        })
+                        .map(|line| line.trim_start_matches(['/', '#', ' ']).to_string())
                 })
                 .unwrap_or_else(|| format!("Plugin skill: {}", name));
 
@@ -203,12 +201,14 @@ impl SkillLoader {
         self.skills.get(&name.to_lowercase()).map(|s| s.as_ref())
     }
 
-    /// Generate system prompt listing all available skills
-    pub fn get_system_prompt(&self) -> String {
+    /// Generate system prompt listing available skills, optionally validating against an exclusion list.
+    pub fn get_system_prompt(&self, excluded_skills: &[&str]) -> String {
         let mut prompt = String::from("Available Skills:\n");
 
         for skill in self.skills.values() {
-            prompt.push_str(&format!("- [{}]: {}\n", skill.name().to_uppercase(), skill.description()));
+            if !excluded_skills.contains(&skill.name()) {
+                prompt.push_str(&format!("- [{}]: {}\n", skill.name().to_uppercase(), skill.description()));
+            }
         }
 
         prompt

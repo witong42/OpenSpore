@@ -11,14 +11,12 @@ impl Skill for SearchSkill {
     fn name(&self) -> &'static str { "search" }
 
     fn description(&self) -> &'static str {
-        "Search the workspace/memory for relevant files. Usage: [SEARCH: \"query\"]"
+        "Search the workspace/memory for relevant files. Returns JSON with success and results (title/path/score). Usage: [SEARCH: \"query\"]"
     }
 
     async fn execute(&self, args: &str) -> Result<String, String> {
         let args = args.trim();
-
-        // Parse --path="..." if present
-        let mut query = args.to_string();
+        let mut query_text = args.to_string();
         let mut search_path = None;
 
         let path_marker = "--path=";
@@ -28,35 +26,48 @@ impl Skill for SearchSkill {
             let end = remainder.find(' ').unwrap_or(remainder.len());
             let raw_p = remainder[..end].trim().trim_matches('"').trim_matches('\'');
             search_path = Some(openspore_core::path_utils::expand_tilde(raw_p));
-
-            // Remove path from query
-            query = format!("{} {}", &args[..idx], &remainder[end..]).trim().to_string();
+            query_text = format!("{} {}", &args[..idx], &remainder[end..]).trim().to_string();
         }
 
-        let query = query.trim().trim_matches('"').trim_matches('\'');
+        let query = query_text.trim().trim_matches('"').trim_matches('\'');
 
         let config = openspore_core::config::AppConfig::load()
             .map_err(|e| format!("Config error: {}", e))?;
         let state = openspore_core::state::AppState::new(config);
         let memory = openspore_memory::MemorySystem::new(&state);
 
-        let results = if let Some(p) = search_path {
+        let results_res = if let Some(p) = search_path {
             let path = Path::new(&p);
             memory.search_in_path(query, path, 10).await
-                .map_err(|e| format!("Search error: {}", e))?
         } else {
             memory.search(query, 10).await
-                .map_err(|e| format!("Search error: {}", e))?
         };
 
-        if results.is_empty() {
-            return Ok("No results found.".to_string());
-        }
+        match results_res {
+            Ok(results) => {
+                let items: Vec<_> = results.into_iter().map(|r| {
+                    serde_json::json!({
+                        "title": r.title,
+                        "path": r.path.to_string_lossy(),
+                        "score": r.score
+                    })
+                }).collect();
 
-        let mut output = format!("Found {} results:\n", results.len());
-        for r in results {
-            output.push_str(&format!("- {} (score: {})\n  Path: {}\n", r.title, r.score, r.path.display()));
+                let res = serde_json::json!({
+                    "success": true,
+                    "query": query,
+                    "results": items
+                });
+                Ok(res.to_string())
+            },
+            Err(e) => {
+                let res = serde_json::json!({
+                    "success": false,
+                    "error": e.to_string(),
+                    "query": query
+                });
+                Ok(res.to_string())
+            }
         }
-        Ok(output)
     }
 }

@@ -1,112 +1,98 @@
- #!/bin/bash
+#!/bin/bash
+# Description: Controls Spotify playback on macOS using AppleScript.
+# Usage: [SPOTIFY: play_song "name" | play_playlist "name" | pause | play | next | prev]
 
-# Function to play a song by name
 play_song() {
-  song_name="$1"
-  osascript -e "
-tell application "Spotify"
-activate
-  search "$song_name" --app "Spotify" 
-  delay 1
-  tell application "System Events" to tell process "Spotify"
-  click menu bar item 1 of menu 1 of menu bar 1
-  end tell
-  delay 1
-  play
-end tell"
-  
-  if [ $? -ne 0 ]; then
-    echo "Error: Failed to play song "$song_name"."
+  local query="$*"
+  if [ -z "$query" ]; then
+    echo "Usage: play_song <song name>"
     exit 1
   fi
-  echo "🔎 Playing Top Result for '$song_name' using UI Automation..."
+
+  echo "🔎 Searching and playing: '$query'..."
+
+  # User confirmed sequence:
+  # Cmd+L -> Type -> Enter (Search) -> Tab -> Tab -> Enter -> Enter (Play)
+  osascript <<EOF
+    tell application "Spotify" to activate
+    delay 1.0
+    tell application "System Events"
+      tell process "Spotify"
+        set frontmost to true
+        keystroke "l" using {command down}
+        delay 0.3
+        keystroke "$query"
+        delay 0.3
+        key code 36 -- Return (Initiate Search)
+        delay 1.0 -- Wait for results to populate
+        key code 48 -- Tab
+        delay 0.3
+        key code 48 -- Tab
+        delay 0.3
+        key code 36 -- Return
+        delay 0.3
+        key code 36 -- Return (Play Top Result)
+      end tell
+    end tell
+EOF
+
+  if [ $? -eq 0 ]; then
+    echo "▶️ Initiated playback for '$query'."
+  else
+    echo "Error: Failed to play song '$query'."
+    exit 1
+  fi
 }
 
-# Function to play a playlist by name
 play_playlist() {
-  playlist_name="$1"
-  osascript -e "
-tell application "Spotify"
-activate
-  search "$playlist_name" --app "Spotify" 
-  delay 1
-  tell application "System Events" to tell process "Spotify"
-  click menu bar item 1 of menu 1 of menu bar 1
-  end tell
-  delay 1
-  play
-end tell"
-  
-  if [ $? -ne 0 ]; then
-    echo "Error: Failed to play playlist "$playlist_name"."
-    exit 1
-  fi
-  echo "🔎 Playing Top Result for '$playlist_name' using UI Automation..."
+  play_song "$@"
 }
 
-# Function to pause Spotify
 pause() {
   osascript -e 'tell application "Spotify" to pause'
-  if [ $? -ne 0 ]; then
-    echo "Error: Failed to pause Spotify."
-    exit 1
-  fi
   echo "⏸️ Spotify paused."
 }
 
-# Function to play Spotify
 play() {
   osascript -e 'tell application "Spotify" to play'
-  if [ $? -ne 0 ]; then
-    echo "Error: Failed to play Spotify."
-    exit 1
-  fi
   echo "▶️ Spotify playing."
 }
 
-# Function to play next track
 next() {
   osascript -e 'tell application "Spotify" to next track'
-  if [ $? -ne 0 ]; then
-    echo "Error: Failed to play next track."
-    exit 1
-  fi
   echo "⏭️ Playing next track."
 }
 
-# Function to play previous track
 prev() {
   osascript -e 'tell application "Spotify" to previous track'
-  if [ $? -ne 0 ]; then
-    echo "Error: Failed to play previous track."
-    exit 1
-  fi
   echo "⏮️ Playing previous track."
 }
 
-# Main script logic
-case "$1" in
+# Main routing logic
+command="$1"
+shift
+
+case "$command" in
   play_song)
-    play_song "${@:2}"
+    play_song "$@"
     ;;
   play_playlist)
-    play_playlist "${@:2}"
+    play_playlist "$@"
     ;;
   pause)
     pause
     ;;
-  play)
+  play|resume)
     play
     ;;
   next)
     next
     ;;
-  prev)
+  prev|previous)
     prev
     ;;
   *)
-    echo "Usage: $0 [play_song "song name" | play_playlist "playlist name" | pause | play | next | prev]"
-    exit 1
+    play_song "$command" "$@"
     ;;
 esac
 

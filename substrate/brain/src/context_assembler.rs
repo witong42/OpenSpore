@@ -1,5 +1,4 @@
 use crate::Brain;
-use tracing::info;
 
 pub struct ContextAssembler;
 
@@ -21,15 +20,24 @@ impl ContextAssembler {
         );
 
         let session_ctx = session_ctx_res.unwrap_or_default();
-
-        info!("📊 Cognition: Standard Mode");
+        let project_root = brain.config.project_root.display().to_string();
 
         // 2. Format Context
-        let skills = brain.skill_loader.get_system_prompt();
+        let skills = if std::env::var("IS_SPORE").is_ok() {
+            // Sub-spores get all tools EXCEPT 'delegate' to prevent recursion
+            brain.skill_loader.get_system_prompt(&["delegate"])
+        } else {
+             // Parent spore gets everything
+            brain.skill_loader.get_system_prompt(&[])
+        };
         let time = chrono::Local::now().format("%Y-%m-%d %H:%M").to_string();
 
-        let session_str = if !session_ctx.recent.is_empty() {
-            format!("<SESSION_HISTORY>\n{}\n</SESSION_HISTORY>", session_ctx.recent)
+        let summary_str = if !session_ctx.summary.is_empty() && session_ctx.summary != "No session summary available." {
+            format!("<SESSION_SUMMARY>\n{}\n</SESSION_SUMMARY>", session_ctx.summary)
+        } else { "".to_string() };
+
+        let recent_str = if !session_ctx.recent.is_empty() {
+            format!("<RECENT_HISTORY>\n{}\n</RECENT_HISTORY>", session_ctx.recent)
         } else { "".to_string() };
 
         let knowledge_str = if !relevant.is_empty() {
@@ -42,43 +50,68 @@ impl ContextAssembler {
             format!("<USER_PREFERENCES>\n{}\n</USER_PREFERENCES>", items)
         } else { "".to_string() };
 
-        let mut identity_str = if !identity.is_empty() {
+        let identity_str = if !identity.is_empty() {
             let items = identity.iter().map(|m| m.content.clone()).collect::<Vec<_>>().join("\n\n");
             format!("<IDENTITY>\n{}\n</IDENTITY>", items)
         } else { "".to_string() };
 
-        // 2e. Swarm Identity Overlays
+        // Swarm Identity Overlays
         if std::env::var("IS_SPORE").is_ok() {
             let role = std::env::var("SPORE_ROLE").unwrap_or_else(|_| "Sub-Agent".to_string());
-            identity_str.push_str(&format!(
-                "\n<SPORE_IDENTITY>\nYou are a specialized sub-spore with the role: {}.\nFocus EXCLUSIVELY on your assigned task. Your output will be consumed by the Parent Spore.\n</SPORE_IDENTITY>",
-                role
-            ));
-        }
 
-        let prompt = format!(r#"
-You are OpenSpore, an autonomous AI system.
-Time: {time}
+            // Lean Spore Prompt
+            let prompt = format!(r#"You are a specialized OpenSpore Sub-Agent.
+Role: {role}
+Root: {project_root}
+
+{knowledge_str}
+
+{skills}
 
 <PRIME_DIRECTIVE>
-1. **Action over Talk**: Use tools immediately to solve the request.
-2. **Mandatory Format**: Call tools EXACTLY like this: `[TOOL_NAME: argument]`.
-   - Correct: [SYS_INFO: ]
-   - Correct: [WRITE_FILE: file.txt --content="hello"]
-3. **Complex Args**: Use JSON for code/multiline: `[SUBMIT_SKILL: {{"filename": "f.js", "code": "..."}}]`.
-4. **CRITICAL**: Do NOT use markdown code blocks (e.g., ```tool_code) for tool calls.
-5. **CRITICAL**: Do NOT use any other format like `TOOL_NAME: argument`. ONLY use `[TOOL_NAME: argument]`.
+1. **EXECUTE**: Focus 100% on the requesting task.
+2. **NO RECURSION**: Do NOT use the [DELEGATE] tool. Use other tools (exec, read_file, search) as needed.
+3. **FORMAT**:
+   - Tool calls: `[TOOL_NAME: arg]`
+   - Final Answer: Just text.
+4. **CONCISENESS**: Be brief and efficient.
 </PRIME_DIRECTIVE>
+
+<TASK>
+{user_prompt}
+</TASK>"#);
+            return (prompt, session_ctx);
+        }
+
+        // Standard Main Agent Prompt
+        let prompt = format!(r#"You are OpenSpore, an autonomous AI system.
+Current Time: {time}
+Substrate Root: {project_root}
 
 {identity_str}
 
 {prefs_str}
 
-{session_str}
-
 {knowledge_str}
 
+{summary_str}
+
+{recent_str}
+
 {skills}
+
+<PRIME_DIRECTIVE>
+You are an agentic engine. Your goal is to fulfill the user request with maximum efficiency, keeping the user informed of your reasoning at every step.
+
+1. **TRANSPARENT ACTION**: Explain your logic briefly *before* or *while* calling tools. This ensures the user is never 'blind' to your process.
+2. **TOOL SYNTAX**: Call tools using the format `[TOOL_NAME: argument]`.
+   - Multi-line/JSON args: `[TOOL_NAME: {{"key": "val"}}]`
+   - NO markdown code blocks (```) for tool calls.
+   - NO other formats like `TOOL: arg`.
+3. **ITERATIVE DEPTH**: For complex tasks, use multiple turns (depth). The system will report each 'layer' of your thinking to the user.
+4. **KNOWLEDGE USAGE**: Use <RELEVANT_KNOWLEDGE> to avoid repeating research.
+5. **STATE AWARENESS**: Use <SESSION_SUMMARY> and <RECENT_HISTORY> to stay consistent with past turns.
+</PRIME_DIRECTIVE>
 
 <USER_REQUEST>
 {user_prompt}

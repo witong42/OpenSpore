@@ -56,5 +56,5 @@ pub fn get_bridge() -> Box<dyn NativeBridge + Send + Sync> {
 }
 
 pub fn init() {
-    println!("🔌 Spore IO Initialized");
+    tracing::info!("🔌 Spore IO Initialized");
 }

@@ -1,9 +1,9 @@
 use crate::{Brain, Message};
-use tracing::{info, warn, error};
+use tracing::{info, warn, error, debug};
 
 impl Brain {
     /// The Core Thinking Loop: Minimalist & Robust
-    pub async fn think(&self, user_prompt: &str) -> String {
+    pub(crate) async fn think_internal(&self, user_prompt: &str, tx: Option<tokio::sync::mpsc::Sender<crate::events::BrainEvent>>) -> String {
         let start_time = std::time::Instant::now();
         info!("🧠 Thinking: {}", user_prompt);
 
@@ -21,7 +21,10 @@ impl Brain {
 
         let mut content = match self.complete(&messages).await {
             Ok(c) => c,
-            Err(e) => return format!("Errors: {}", e),
+            Err(e) => {
+                if let Some(t) = &tx { let _ = t.send(crate::events::BrainEvent::Error(e.to_string())).await; }
+                return format!("Errors: {}", e);
+            }
         };
 
         // 3. Tool Loop
@@ -35,10 +38,47 @@ impl Brain {
                 break;
             }
 
-            info!("Raw LLM Output (Depth {}): {:?}", depth, content);
+            debug!("Raw LLM Output (Depth {}): {:?}", depth, content);
+
+            // Notify observer of the thinking layer
+            if let Some(t) = &tx {
+                let _ = t.send(crate::events::BrainEvent::ThoughtLayer {
+                    depth,
+                    content: content.clone(),
+                }).await;
+            } else {
+                // Layer Visibility (Only if no observer is active, e.g. CLI one-shot)
+                debug!("\n<details>\n<summary>▶ [Layer {}] Thinking Process</summary>\n\n{}\n\n</details>", depth, content);
+            }
+
 
             // Robust Parser (State Machine) to handle nested brackets/JSON
             let tools_to_run = crate::parser::ToolParser::extract_tools(&content, &self.skill_loader);
+
+            // Self-Correction: Check for common hallucinated tool formats (Markdown blocks)
+            // We check this BEFORE deciding to break, because if the model tried to run a tool via markdown,
+            // tools_to_run WILL be empty, and we want to catch it.
+            if tools_to_run.is_empty() && (content.contains("```tool_code") || content.contains("```python") || content.contains("```javascript") || content.contains("```bash")) {
+                 warn!("⚠️ Detected invalid markdown tool usage. Triggering self-correction.");
+
+                 messages.push(Message { role: "assistant".into(), content: content.clone() });
+                 messages.push(Message {
+                     role: "user".into(),
+                     content: "SYSTEM ERROR: You attempted to use a tool using Markdown code blocks (```). THIS IS INVALID. \n\nREQUIRED SYNTAX: `[TOOL_NAME: argument]`\n\nExample: `[DELEGATE: \"task\"]`\n\nPlease retry immediately with the correct syntax.".into()
+                 });
+
+                 match self.complete(&messages).await {
+                    Ok(new_content) => {
+                        content = new_content;
+                        depth += 1;
+                        continue;
+                    },
+                    Err(e) => {
+                         error!("Re-think error during self-correction: {}", e);
+                         break;
+                    }
+                 }
+            }
 
             if tools_to_run.is_empty() {
                 break;
@@ -49,15 +89,42 @@ impl Brain {
             for (name, arg) in tools_to_run {
                 if let Some(skill) = self.skill_loader.get(&name) {
                     info!("⚙️ Executing: [{} : {}]", name, arg);
-                    println!("⚙️ Executing: [{} : {}]", name, arg); // Force visual output in TUI
+
+                    if let Some(t) = &tx {
+                        let _ = t.send(crate::events::BrainEvent::ToolExecution {
+                            name: name.clone(),
+                            arg: arg.clone(),
+                        }).await;
+                    } else {
+                        info!("⚙️ Executing: [{} : {}]", name, arg); // Log visual output in CLI mode
+                    }
+
                     match skill.execute(&arg).await {
                         Ok(output) => {
                             let preview = output.chars().take(100).collect::<String>();
                             info!("✅ Result: {}...", preview);
+
+                            if let Some(t) = &tx {
+                                let _ = t.send(crate::events::BrainEvent::ToolResult {
+                                    name: name.clone(),
+                                    output: output.clone(),
+                                    success: true,
+                                }).await;
+                            }
+
                             tool_outputs.push_str(&format!("\n--- Output from {} ---\n{}\n", name, output));
                         },
                         Err(e) => {
                             error!("❌ Error executing {}: {}", name, e);
+
+                            if let Some(t) = &tx {
+                                let _ = t.send(crate::events::BrainEvent::ToolResult {
+                                    name: name.clone(),
+                                    output: e.clone(),
+                                    success: false,
+                                }).await;
+                            }
+
                             tool_outputs.push_str(&format!("\n--- Error from {} ---\n{}\n", name, e));
                         }
                     }
@@ -79,10 +146,16 @@ impl Brain {
                 Ok(new_content) => content = new_content,
                 Err(e) => {
                     error!("Re-think error: {}", e);
+                    if let Some(t) = &tx { let _ = t.send(crate::events::BrainEvent::Error(e.to_string())).await; }
                     break;
                 }
             }
             depth += 1;
+        }
+
+        // Final answer notification
+        if let Some(t) = &tx {
+            let _ = t.send(crate::events::BrainEvent::FinalAnswer(content.clone())).await;
         }
 
         // Save interaction for Watchman to analyze
@@ -106,14 +179,12 @@ impl Brain {
                 // 2. Compress context if needed (deferred)
                 if !older_items.is_empty() {
                     if let Err(e) = brain.context_manager.compress_older_items(older_items, &brain).await {
-                         // Gracefully log but don't fail, as a parallel task might have already compressed
                          warn!("Context compression notice (might be parallel task): {}", e);
                     }
                 }
             }
         });
 
-        // Log significant events to LOGS.md
         // Log FULL raw interaction to LOGS.md (Result of turn)
         let end_log = format!("\nAI: {}\n", content);
         if let Err(e) = self.memory.save_journal(&end_log).await {

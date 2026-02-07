@@ -4,7 +4,6 @@
 use super::Skill;
 use async_trait::async_trait;
 use tokio::fs;
-use std::path::PathBuf;
 
 pub struct SubmitSkill;
 
@@ -28,7 +27,7 @@ impl Skill for SubmitSkill {
     fn name(&self) -> &'static str { "submit_skill" }
 
     fn description(&self) -> &'static str {
-        "Deploy a self-generated logic module (JS/Shell) to the skills directory for immediate use. Usage: [SUBMIT_SKILL: \"filename.js|||literal_code_content\"]"
+        "Deploy a self-generated logic module (JS/Shell) to the skills directory for immediate use. Returns JSON with success and message. Usage: [SUBMIT_SKILL: \"filename.js|||literal_code_content\"]"
     }
 
     async fn execute(&self, args: &str) -> Result<String, String> {
@@ -41,10 +40,11 @@ impl Skill for SubmitSkill {
             let parts: Vec<&str> = args.split(separator).collect();
 
             if parts.len() < 2 {
-                return Err("Usage: [SUBMIT_SKILL: {\"filename\": \"...\", \"code\": \"...\"}] or [SUBMIT_SKILL: \"filename|||code\"]".to_string());
+                let res = serde_json::json!({ "success": false, "error": "Usage: [SUBMIT_SKILL: {\"filename\": \"...\", \"code\": \"...\"}] or [SUBMIT_SKILL: \"filename|||code\"]" });
+                return Ok(res.to_string());
             }
 
-            let filename = parts[0].trim().trim_matches('"').trim_matches('\'').trim().to_string();
+            let filename = crate::utils::sanitize_path(parts[0]);
             let code = parts[1..].join(separator);
             (filename, code)
         };
@@ -53,7 +53,8 @@ impl Skill for SubmitSkill {
         let trimmed_code = code.trim();
         if (trimmed_code.starts_with('/') || trimmed_code.starts_with('~') || trimmed_code.starts_with("./"))
            && !trimmed_code.contains('\n') && !trimmed_code.contains(' ') && !trimmed_code.contains('{') {
-               return Err(format!("Blocked by Self-Defense: SUBMIT_SKILL requires the literal content of the code, not a path to it. You provided: '{}'", trimmed_code));
+                let res = serde_json::json!({ "success": false, "error": format!("Blocked by Self-Defense: SUBMIT_SKILL requires the literal content of the code, not a path to it. You provided: '{}'", trimmed_code) });
+                return Ok(res.to_string());
         }
 
         // Validation
@@ -67,10 +68,7 @@ impl Skill for SubmitSkill {
         }
 
         // 2. Simple require check (heuristic)
-        // Note: Rust regex would be better but keeping it simple as per JS port for now.
-        // We look for require("...") or require('...')
         if code.contains("require(") {
-             // Basic extraction logic
              let mut cursor = 0;
              while let Some(start) = code[cursor..].find("require(") {
                  let start_idx = cursor + start + 8;
@@ -90,27 +88,62 @@ impl Skill for SubmitSkill {
         }
 
         if !issues.is_empty() {
-            return Err(format!("Blocked by Self-Defense: {}", issues.join(", ")));
+             let res = serde_json::json!({ "success": false, "error": format!("Blocked by Self-Defense: {}", issues.join(", ")) });
+             return Ok(res.to_string());
         }
 
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        let target_dir = PathBuf::from(format!("{}/.openspore/skills", home));
+        let root = openspore_core::path_utils::get_app_root();
+        let target_dir = root.join("skills");
         let file_path = target_dir.join(&filename);
 
         // Security check: ensure path is within skills directory
         if !file_path.starts_with(&target_dir) {
-            return Err("Error: Skill deployment is restricted to ~/.openspore/skills/".to_string());
+             let res = serde_json::json!({ "success": false, "error": "Error: Skill deployment is restricted to ~/.openspore/skills/" });
+             return Ok(res.to_string());
         }
 
         if !target_dir.exists() {
-            fs::create_dir_all(&target_dir).await.map_err(|e| e.to_string())?;
+            if let Err(e) = fs::create_dir_all(&target_dir).await {
+                let res = serde_json::json!({ "success": false, "error": format!("Failed to create skills directory: {}", e) });
+                return Ok(res.to_string());
+            }
         }
 
-        // Unescape code (handles \n, \", etc.)
-        let final_code = crate::utils::unescape(&code);
+        // Unescape code (only if it wasn't valid JSON, as the JSON parser handles escapes)
+        let final_code = if crate::utils::try_parse_json(args).is_some() {
+            code
+        } else {
+            crate::utils::unescape(&code)
+        };
 
-        fs::write(&file_path, final_code).await.map_err(|e| e.to_string())?;
+        // NEW: Sanitize file content (Remove Markdown Blocks)
+        let mut content_to_write = final_code.trim();
+        // Check for common markdown block patterns at START
+        let mut clean_content = content_to_write.to_string();
 
-        Ok(format!("Success: Skill {} deployed to {} and validated.", filename, target_dir.display()))
+        if content_to_write.starts_with("```") {
+            let lines: Vec<&str> = content_to_write.lines().collect();
+            if lines.len() >= 2 {
+                let start = if lines[0].starts_with("```") { 1 } else { 0 };
+                let end = if lines.last().unwrap_or(&"").starts_with("```") { lines.len() - 1 } else { lines.len() };
+                clean_content = lines[start..end].join("\n");
+            }
+        }
+        content_to_write = &clean_content;
+
+        match fs::write(&file_path, content_to_write).await {
+            Ok(_) => {
+                let res = serde_json::json!({
+                    "success": true,
+                    "filename": filename,
+                    "message": format!("Skill {} deployed to {} and validated.", filename, target_dir.display())
+                });
+                Ok(res.to_string())
+            },
+            Err(e) => {
+                let res = serde_json::json!({ "success": false, "error": format!("Failed to write skill file: {}", e) });
+                Ok(res.to_string())
+            }
+        }
     }
 }

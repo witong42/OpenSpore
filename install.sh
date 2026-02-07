@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # OpenSpore Installation Script
-# Usage: curl -fsSL https://openspore.ai/install.sh | bash
-# Or: ./install.sh
+# Usage: ./install.sh [options]
 
 set -e
 
@@ -13,99 +12,135 @@ CYAN='\033[0;36m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+INSTALL_DIR="$HOME/.openspore"
+BIN_DIR="/usr/local/bin"
+MODE="binary" # binary | compile
+
+# Parse Arguments
+if [[ "$1" == "-help" || "$1" == "--help" ]]; then
+    echo "Usage: ./install.sh [options]"
+    echo ""
+    echo "Options:"
+    echo "  (no args)   Install using pre-compiled binary (if present)"
+    echo "  -compile    Force build from source using Cargo"
+    echo "  -uninstall  Remove OpenSpore from system"
+    echo "  -help       Show this help message"
+    echo ""
+    exit 0
+fi
+
+if [[ "$1" == "-uninstall" ]]; then
+    echo -e "${RED}🗑️  Uninstalling OpenSpore...${NC}"
+
+    # Remove binary
+    if [ -f "$BIN_DIR/openspore" ]; then
+        echo "Removing $BIN_DIR/openspore..."
+        if [ -w "$BIN_DIR" ]; then
+            rm "$BIN_DIR/openspore"
+        else
+            sudo rm "$BIN_DIR/openspore"
+        fi
+    fi
+
+    # Remove config dir (optional)
+    if [ -d "$INSTALL_DIR" ]; then
+        read -p "Remove $INSTALL_DIR (contains config & memory)? [y/N] " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            rm -rf "$INSTALL_DIR"
+            echo "Removed $INSTALL_DIR"
+        else
+            echo "Kept $INSTALL_DIR"
+        fi
+    fi
+
+    echo -e "${GREEN}✅ Uninstalled.${NC}"
+    exit 0
+fi
+
+if [[ "$1" == "-compile" ]]; then
+    MODE="compile"
+fi
+
 echo ""
-echo -e "${CYAN}🍄 OpenSpore Installer${NC}"
+echo -e "${CYAN}🍄 OpenSpore Installer ($MODE mode)${NC}"
 echo "─────────────────────────────────"
 echo ""
 
-# Check for Rust
-if ! command -v cargo &> /dev/null; then
-    echo -e "${RED}❌ Rust/Cargo not found.${NC}"
-    echo "Install Rust first: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-    exit 1
-fi
+# Installation Logic
+mkdir -p "$INSTALL_DIR"
 
-INSTALL_DIR="$HOME/.openspore"
-BIN_DIR="/usr/local/bin"
-
-# Clone or update
+# 1. Setup Files
 if [ -d "$INSTALL_DIR/.git" ]; then
-    echo -e "${YELLOW}📦 Updating existing installation...${NC}"
-    cd "$INSTALL_DIR"
-    git pull --quiet
+     echo -e "${YELLOW}📁 Using existing repo at $INSTALL_DIR${NC}"
 else
-    if [ -d "$INSTALL_DIR" ]; then
-        echo -e "${YELLOW}📁 Using existing ~/.openspore directory${NC}"
+    # Verify we are in the repo to copy files from
+    if [ -f "./substrate/Cargo.toml" ]; then
+        # Running from source root
+        # Copy substrate content if needed, but usually we just link if running from source
+        # For this script we assume running FROM the repo root
+        echo -e "${YELLOW}📁 Setting up environment...${NC}"
     else
-        echo -e "${YELLOW}📦 Installing to ~/.openspore...${NC}"
-        mkdir -p "$INSTALL_DIR"
+        echo -e "${RED}❌ Please run ./install.sh from the project root.${NC}"
+        exit 1
     fi
 fi
 
-cd "$INSTALL_DIR"
+# 2. Install Binary
+TARGET_BINARY=""
 
-# Check if substrate exists (for local development vs fresh install)
-if [ ! -d "$INSTALL_DIR/substrate" ]; then
-    echo -e "${RED}❌ substrate/ directory not found.${NC}"
-    echo "For development: ensure substrate/ exists"
-    exit 1
+if [[ "$MODE" == "binary" ]]; then
+    if [ -f "./openspore" ]; then
+        echo -e "${GREEN}📦 Found pre-compiled binary.${NC}"
+        TARGET_BINARY="$(pwd)/openspore"
+    else
+        echo -e "${YELLOW}⚠️  Pre-compiled binary './openspore' not found.${NC}"
+        echo -e "${YELLOW}   Switching to compile mode...${NC}"
+        MODE="compile"
+    fi
 fi
 
-# Build release binary
-echo -e "${YELLOW}🔨 Building release binary (this may take a minute)...${NC}"
-cargo build --release --manifest-path "$INSTALL_DIR/substrate/Cargo.toml" 2>&1 | tail -5
+if [[ "$MODE" == "compile" ]]; then
+    # Check for Rust
+    if ! command -v cargo &> /dev/null; then
+        echo -e "${RED}❌ Rust/Cargo not found.${NC}"
+        echo "Install Rust first: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+        exit 1
+    fi
 
-# Create symlink
-echo -e "${YELLOW}🔗 Installing to $BIN_DIR/openspore...${NC}"
+    echo -e "${YELLOW}🔨 Building release binary (this may take a minute)...${NC}"
+    cargo build --release --manifest-path "./substrate/Cargo.toml"
+    TARGET_BINARY="$(pwd)/substrate/target/release/openspore"
+fi
+
+# 3. Create Symlink
+echo -e "${YELLOW}🔗 Linking openspore to $BIN_DIR...${NC}"
 if [ -w "$BIN_DIR" ]; then
-    ln -sf "$INSTALL_DIR/substrate/target/release/openspore" "$BIN_DIR/openspore"
+    ln -sf "$TARGET_BINARY" "$BIN_DIR/openspore"
 else
     echo -e "${YELLOW}   Need sudo to write to $BIN_DIR${NC}"
-    sudo ln -sf "$INSTALL_DIR/substrate/target/release/openspore" "$BIN_DIR/openspore"
+    sudo ln -sf "$TARGET_BINARY" "$BIN_DIR/openspore"
 fi
 
-# Setup workspace directories
-echo -e "${YELLOW}📁 Setting up workspace...${NC}"
-mkdir -p "$INSTALL_DIR/workspace/identity"
+# 4. Workspace & Env
+echo -e "${YELLOW}📁 Setting up workspace dirs...${NC}"
 mkdir -p "$INSTALL_DIR/workspace/context"
 mkdir -p "$INSTALL_DIR/workspace/memory"
-mkdir -p "$INSTALL_DIR/workspace/knowledge"
-mkdir -p "$INSTALL_DIR/workspace/preferences"
-mkdir -p "$INSTALL_DIR/workspace/autonomy/proposals"
-mkdir -p "$INSTALL_DIR/workspace/cron"
 mkdir -p "$INSTALL_DIR/skills"
 
-# Create .env if missing
+# Copy/Link .env if needed
 if [ ! -f "$INSTALL_DIR/.env" ]; then
-    if [ -f "$INSTALL_DIR/.env.example" ]; then
-        cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
-        echo -e "${YELLOW}📝 Created .env from template${NC}"
-        echo -e "${RED}   ⚠️  Edit ~/.openspore/.env and add your API keys!${NC}"
+    if [ -f "./.env" ]; then
+        cp "./.env" "$INSTALL_DIR/.env"
+        echo -e "${GREEN}📝 Copied .env${NC}"
+    elif [ -f "./.env.example" ]; then
+        cp "./.env.example" "$INSTALL_DIR/.env"
+        echo -e "${YELLOW}📝 Created .env from template (needs editing)${NC}"
     fi
 fi
 
-# Verify installation
-if command -v openspore &> /dev/null; then
-    VERSION=$(openspore --version 2>/dev/null || echo "unknown")
-    echo ""
-    echo -e "${GREEN}✅ OpenSpore installed successfully!${NC}"
-    echo ""
-    echo "   Version: $VERSION"
-    echo "   Binary:  $BIN_DIR/openspore"
-    echo "   Config:  $INSTALL_DIR/.env"
-    echo ""
-    echo -e "${CYAN}Quick Start:${NC}"
-    echo "   openspore start    # Start the interactive agent"
-    echo "   openspore doctor   # Run system diagnostics"
-    echo "   openspore --help   # See all commands"
-    echo ""
-
-    if [ ! -f "$INSTALL_DIR/.env" ] || grep -q "YOUR_KEY_HERE" "$INSTALL_DIR/.env" 2>/dev/null; then
-        echo -e "${YELLOW}⚠️  Don't forget to configure your API key:${NC}"
-        echo "   nano ~/.openspore/.env"
-        echo ""
-    fi
-else
-    echo -e "${RED}❌ Installation failed - 'openspore' command not found${NC}"
-    exit 1
-fi
+# Success
+VERSION=$(openspore --version 2>/dev/null || echo "unknown")
+echo ""
+echo -e "${GREEN}✅ Installed OpenSpore $VERSION!${NC}"
+echo "   Run 'openspore start'"

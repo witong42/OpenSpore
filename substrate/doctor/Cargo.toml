@@ -1,8 +1,10 @@
 [package]
 name = "openspore-doctor"
-version = "0.1.0"
+version = "1.0.1"
 edition = "2024"
 
 [dependencies]
 tokio = { version = "1.49", features = ["full", "process"] }
 anyhow = "1.0"
+tracing = "0.1"
+openspore-core = { path = "../core" }
