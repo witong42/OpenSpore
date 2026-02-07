@@ -44,14 +44,21 @@ impl Skill for ExecSkill {
 
         // SAFE MODE CHECK (EXEC)
         if crate::utils::is_safe_mode_active() {
-            let forbidden_keywords = ["rm ", "mv ", "sed ", "cargo build", "git checkout", "git reset", "git clean", "chmod ", "chown "];
+            let dangerous_keywords = ["rm ", "mv ", "sed ", "cargo build", "git checkout", "git reset", "git clean", "chmod ", "chown "];
             let lower_cmd = final_cmd.to_lowercase();
-            if forbidden_keywords.iter().any(|kw| lower_cmd.contains(kw)) {
-                 let res = serde_json::json!({
-                    "success": false,
-                    "error": "SAFE_MODE_ENABLED: This command is blocked because it potentially modifies the crates (logic)."
-                });
-                return Ok(serde_json::to_string_pretty(&res).unwrap_or_default());
+
+            if dangerous_keywords.iter().any(|kw| lower_cmd.contains(kw)) {
+                // Determine if any part of the command targets the protected engine paths
+                let protected_targets = ["crates/", "/crates", ".env", "cargo.toml", "cargo.lock", "install.sh", "readme.md"];
+                let targets_protected = protected_targets.iter().any(|t| lower_cmd.contains(t.to_lowercase().as_str()));
+
+                if targets_protected {
+                     let res = serde_json::json!({
+                        "success": false,
+                        "error": "SAFE_MODE_ENABLED: This command is blocked because it targets protected engine crates or configuration."
+                    });
+                    return Ok(serde_json::to_string_pretty(&res).unwrap_or_default());
+                }
             }
         }
 

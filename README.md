@@ -3,6 +3,7 @@
 # OpenSpore v1.1.3
 
 **The Autonomous AI Agent Ecosystem**
+*A minimalist Rust implementation of the OpenClaw architecture.*
 
 [![Rust](https://img.shields.io/badge/built_with-Rust-dca282.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -19,7 +20,9 @@
 
 ## 📖 Overview
 
-**OpenSpore** is a high-performance, autonomous AI agent engine ecosystem built in Rust. It is designed to be a "living" system that operates continuously, managing its own memory, executing complex multi-step tasks, and orchestrating a **parallel swarm of specialized sub-agents**. It features a rich Terminal User Interface (TUI) for observation, and a robust "Brain" that interfaces with powerful LLMs (Anthropic Claude, Google Gemini, OpenAI GPT) via **Parallel Tool Execution**.
+**OpenSpore** is a high-performance, autonomous AI agent engine built in Rust. It serves as a **minimalist, simplified implementation of the OpenClaw architecture**, focusing on core autonomy, safety, and parallel tool execution without the overhead of larger frameworks.
+
+It is designed to be a "living" system that operates continuously, managing its own memory, executing complex multi-step tasks, and orchestrating a **parallel swarm of specialized sub-agents**. It features a rich Terminal User Interface (TUI) for observation, and a robust "Brain" that interfaces with powerful LLMs (Anthropic Claude, Google Gemini, OpenAI GPT) via **Parallel Tool Execution**.
 
 This release, **v1.1.3**, signals the transition from individual autonomy to **Swarm Intelligence**. It introduces hierarchical task decomposition, a process-wide concurrency limit of 6 simultaneous spores, and a negotiation-based consensus loop for autonomous proposals.
 
@@ -119,16 +122,16 @@ SAFE_MODE_ENABLED=true       # Restrict AI from modifying its own logic (crates)
 
 ## 🛡️ Security & Safe Mode
 
-Because OpenSpore is an autonomous agent with the ability to modify files and run shell commands, it includes a **Safe Mode** to protect the integrity of the system (the crates).
+Because OpenSpore is an autonomous agent with the ability to modify files and run shell commands, it includes a **Safe Mode** to protect the integrity of the core system (the crates).
 
 When `SAFE_MODE_ENABLED=true` is set in your `.env`:
 
-1. **Write Protection**: The AI is blocked from modifying files inside the `crates/` and `skills/` directories.
-2. **Config Protection**: Key files like `.env`, `Cargo.toml`, and `install.sh` are read-only for the agent.
-3. **Command Filtering**: Dangerous shell commands (e.g., `rm`, `mv`, `sed`) are filtered and blocked if they target core crates or config.
-4. **Self-Awareness**: The agent is explicitly told it is in Safe Mode through its prime directive.
+1. **Write Protection**: The AI is blocked from modifying files inside the `crates/` directory.
+2. **Safe Zones**: The AI **is permitted** to modify files in `skills/` and `workspace/`. This allows for new capabilities and state management while keeping the engine logic isolated.
+3. **Config Protection**: Key system files like `.env`, `Cargo.toml`, and `install.sh` are read-only for the agent.
+4. **Command Filtering**: Dangerous shell commands (e.g., `rm`, `mv`, `sed`) are filtered and blocked if they target core crates or config.
 
-We recommend keeping Safe Mode **enabled** unless you are specifically instructing the agent to perform an authorized system upgrade.
+We recommend keeping Safe Mode **enabled** unless you are specifically instructing the agent to perform an authorized core system upgrade.
 ### 2. Define Identity
 OpenSpore's "recursive intelligence" is shaped by Markdown files in `~/.openspore/workspace/identity/`.
 
@@ -152,6 +155,7 @@ To control OpenSpore remotely via Telegram:
     ```env
     TELEGRAM_BOT_TOKEN=your_token_here
     TELEGRAM_ALLOWED_USERS=your_id_here
+    ```
 
 ---
 

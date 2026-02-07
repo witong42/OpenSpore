@@ -84,10 +84,5 @@ pub fn is_path_protected(path_str: &str) -> bool {
         }
     }
 
-    // 3. Block the 'skills' directory (where core skills and plugins live)
-    if abs_str.contains(&format!("{}/skills", root_str)) {
-        return true;
-    }
-
     false
 }
