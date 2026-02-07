@@ -74,8 +74,14 @@ We provide a versatile installer script:
 ```
 
 ### Build from Source
-If the pre-compiled binary doesn't work for your architecture (macOS/Linux), build from source:
+If the pre-compiled binary doesn't work for your architecture (macOS/Linux), you can build from source.
 
+**Prerequisites (Linux/Ubuntu):**
+```bash
+sudo apt update && sudo apt install -y pkg-config libssl-dev
+```
+
+**Build command:**
 ```bash
 cargo build --release --manifest-path ./substrate/Cargo.toml
 ```
@@ -89,28 +95,7 @@ OpenSpore requires a `.env` file in the project root (`~/.openspore/.env` by def
 **Note:** Currently, OpenSpore **only supports OpenRouter** for LLM connectivity to access various models (Claude, Gemini, GPT-4) via a unified interface.
 
 ### 1. Setup Environment
-Run the interactive doctor to guide you through setup:
-```bash
-openspore doctor
-```
-
-### 2. Telegram Integration (Optional)
-To control OpenSpore remotely via Telegram:
-
-1.  **Create a Bot:**
-    *   Open Telegram and search for **@BotFather**.
-    *   Send `/newbot` and follow instructions.
-    *   Copy the **HTTP API Token** provided.
-
-2.  **Get your Chat ID:**
-    *   Search for **@userinfobot** (or any "Get ID" bot).
-    *   Click "Start" to see your numerical ID (e.g., `123456789`).
-
-3.  **Update `.env`:**
-    ```env
-    TELEGRAM_BOT_TOKEN=your_token_here
-    TELEGRAM_ALLOWED_USERS=your_id_here
-    ```
+Run the interactive doctor to guide you through initial `.env` setup:
 
 **Key `.env` Variables:**
 ```env
@@ -127,6 +112,29 @@ OPENSPORE_ROOT=.openspore
 # Autonomy
 AUTONOMY_ENABLED=true       # Enable/Disable background agent
 ```
+### 2. Define Identity
+OpenSpore's "recursive intelligence" is shaped by Markdown files in `~/.openspore/workspace/identity/`.
+
+- **`SOUL.md`**: Define your agent's core personality, tone, and ethical boundaries.
+- **`USER.md`**: Provide context about yourself, your projects, and your preferences so the Brain can better assist you.
+- **`AGENTS.md`**: Define agent roles and capabilities.
+
+### 3. Telegram Integration (Optional)
+To control OpenSpore remotely via Telegram:
+
+1.  **Create a Bot:**
+    *   Open Telegram and search for **@BotFather**.
+    *   Send `/newbot` and follow instructions.
+    *   Copy the **HTTP API Token** provided.
+
+2.  **Get your Chat ID:**
+    *   Search for **@userinfobot** (or any "Get ID" bot).
+    *   Click "Start" to see your numerical ID (e.g., `123456789`).
+
+3.  **Update `.env`:**
+    ```env
+    TELEGRAM_BOT_TOKEN=your_token_here
+    TELEGRAM_ALLOWED_USERS=your_id_here
 
 ---
 

@@ -89,23 +89,44 @@ async fn main() {
 
     openspore_core::init();
 
+    // 1. Commands that DON'T require config
+    if let Some(cmd) = &args.command {
+        match cmd {
+            Commands::Stop => {
+                println!("🛑 Stopping all OpenSpore instances...");
+                let _ = Command::new("pkill")
+                    .args(["-f", "openspore"])
+                    .status();
+                println!("✅ All instances stopped.");
+                return;
+            }
+            Commands::Doctor => {
+                let mut doctor = openspore_doctor::SporeDoctor::new();
+                doctor.check_all();
+                return;
+            }
+            _ => {} // Continue to config loading for other commands
+        }
+    }
+
+    // 2. Load Config (Required for all remaining commands)
+    let config = match AppConfig::load() {
+        Ok(cfg) => cfg,
+        Err(_) => {
+            eprintln!("❌ Error: Configuration missing or invalid.");
+            eprintln!("   Please ensure ~/.openspore/.env exists and contains a valid OPENROUTER_API_KEY.");
+            eprintln!("   Run 'openspore doctor' for diagnostics.");
+            std::process::exit(1);
+        }
+    };
+
+    // 3. Command Dispatch
     match args.command {
         Some(Commands::Start) | None => {
             // TUI Mode
             if let Err(e) = openspore_tui::run().await {
                 eprintln!("TUI Error: {}", e);
             }
-        }
-        Some(Commands::Stop) => {
-            println!("🛑 Stopping all OpenSpore instances...");
-            let _ = Command::new("pkill")
-                .args(["-f", "openspore"])
-                .status();
-            println!("✅ All instances stopped.");
-        }
-        Some(Commands::Doctor) => {
-            let mut doctor = openspore_doctor::SporeDoctor::new();
-            doctor.check_all();
         }
         Some(Commands::Cron { action }) => {
             let cron_dir = format!("{}/workspace/cron", app_dir);
@@ -136,7 +157,6 @@ async fn main() {
                                 let binary = format!("{}/substrate/target/release/openspore", app_dir);
                                 let mut cron_lines = Vec::new();
 
-                                // Preserve existing non-openspore cron jobs
                                 if let Ok(output) = Command::new("crontab").arg("-l").output() {
                                     let content = String::from_utf8_lossy(&output.stdout);
                                     for line in content.lines() {
@@ -152,10 +172,8 @@ async fn main() {
                                 }
 
                                 let new_crontab = cron_lines.join("\n") + "\n";
-
                                 println!("Installing {} cron entries...", cron_lines.len());
 
-                                // Write to crontab via stdin
                                 use std::io::Write;
                                 let mut child = Command::new("crontab")
                                     .stdin(std::process::Stdio::piped())
@@ -211,7 +229,6 @@ async fn main() {
         Some(Commands::Swarm) => {
             println!("🐝 [Swarm Status]: Scanning for active sub-spores...");
             let swarm = openspore_swarm::SwarmManager::new();
-
             match swarm.discovery().await {
                 Ok(lines) => {
                     if lines.is_empty() {
@@ -228,83 +245,57 @@ async fn main() {
         }
         Some(Commands::Auto) => {
             println!("🧠 [Autonomy Engine]: Analyzing patterns & generating proposal...");
-            match AppConfig::load() {
-                Ok(config) => {
-                    let state = openspore_core::state::AppState::new(config.clone());
-                    let brain = Brain::new(config);
-                    let memory = openspore_memory::MemorySystem::new(&state);
+            let state = openspore_core::state::AppState::new(config.clone());
+            let brain = Brain::new(config);
+            let memory = openspore_memory::MemorySystem::new(&state);
 
-                    match openspore_autonomy::AutonomyEngine::run(&brain, &memory).await {
-                        Ok(Some(path)) => println!("\n✅ Proposal created at: {}", path.display()),
-                        Ok(None) => println!("\n⏸️ No new proposal deemed necessary at this time."),
-                        Err(e) => error!("Autonomy Engine failed: {}", e),
-                    }
-                }
-                Err(e) => error!("Failed to load config: {}", e),
+            match openspore_autonomy::AutonomyEngine::run(&brain, &memory).await {
+                Ok(Some(path)) => println!("\n✅ Proposal created at: {}", path.display()),
+                Ok(None) => println!("\n⏸️ No new proposal deemed necessary at this time."),
+                Err(e) => error!("Autonomy Engine failed: {}", e),
             }
         }
         Some(Commands::Logs) => {
             let context_dir = format!("{}/workspace/context", app_dir);
             println!("📜 Recent context files:\n");
-            let output = Command::new("ls")
-                .args(["-lt", &context_dir])
-                .output();
+            let output = Command::new("ls").args(["-lt", &context_dir]).output();
             if let Ok(out) = output {
                 let content = String::from_utf8_lossy(&out.stdout);
-                for line in content.lines().take(10) {
-                    println!("{}", line);
-                }
+                for line in content.lines().take(10) { println!("{}", line); }
             }
         }
         Some(Commands::Think { prompt, role }) => {
-            match AppConfig::load() {
-                Ok(config) => {
-                    let brain = Brain::new(config);
-                    // Set IS_SPORE for this process
-                    unsafe {
-                        std::env::set_var("IS_SPORE", "true");
-                        if let Some(r) = role {
-                            std::env::set_var("SPORE_ROLE", r);
-                        }
-                    }
-
-                    let response = brain.think(&prompt).await;
-                    println!("{}", response);
-                }
-                Err(e) => error!("Failed to load config: {}", e),
+            let brain = Brain::new(config);
+            unsafe {
+                std::env::set_var("IS_SPORE", "true");
+                if let Some(r) = role { std::env::set_var("SPORE_ROLE", r); }
             }
+            let response = brain.think(&prompt).await;
+            println!("{}", response);
         }
         Some(Commands::Heartbeat) => {
             println!("💓 [System Heartbeat]");
-            if let Ok(config) = AppConfig::load() {
-                let state = openspore_core::state::AppState::new(config.clone());
-                let brain = openspore_brain::Brain::new(config);
-                let memory = openspore_memory::MemorySystem::new(&state);
-                // Telegram might not be configured, optional
-                let telegram = openspore_telegram::TelegramChannel::new().ok();
+            let state = openspore_core::state::AppState::new(config.clone());
+            let brain = openspore_brain::Brain::new(config);
+            let memory = openspore_memory::MemorySystem::new(&state);
+            let telegram = openspore_telegram::TelegramChannel::new().ok();
 
-                if let Err(e) = openspore_autonomy::Heartbeat::run(&brain, &memory, telegram.as_ref()).await {
-                    error!("Heartbeat failed: {}", e);
-                }
-            } else {
-                error!("Failed to load config (is .openspore/ initialized?)");
+            if let Err(e) = openspore_autonomy::Heartbeat::run(&brain, &memory, telegram.as_ref()).await {
+                error!("Heartbeat failed: {}", e);
             }
         }
         Some(Commands::Journal) => {
             println!("📓 [Daily Journal Synthesis]");
-            if let Ok(config) = AppConfig::load() {
-                let state = openspore_core::state::AppState::new(config.clone());
-                let brain = openspore_brain::Brain::new(config);
-                let memory = openspore_memory::MemorySystem::new(&state);
+            let state = openspore_core::state::AppState::new(config.clone());
+            let brain = openspore_brain::Brain::new(config);
+            let memory = openspore_memory::MemorySystem::new(&state);
 
-                match openspore_autonomy::DailyJournal::run(&brain, &memory).await {
-                    Ok(Some(path)) => println!("✅ Journal created: {:?}", path),
-                    Ok(None) => println!("⏸️ No journal created (already exists or empty context)"),
-                    Err(e) => error!("Journal synthesis failed: {}", e),
-                }
-            } else {
-                error!("Failed to load config");
+            match openspore_autonomy::DailyJournal::run(&brain, &memory).await {
+                Ok(Some(path)) => println!("✅ Journal created: {:?}", path),
+                Ok(None) => println!("⏸️ No journal created (already exists or empty context)"),
+                Err(e) => error!("Journal synthesis failed: {}", e),
             }
         }
+        _ => {} // Already handled Stop/Doctor
     }
 }

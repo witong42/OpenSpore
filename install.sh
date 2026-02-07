@@ -128,19 +128,17 @@ mkdir -p "$INSTALL_DIR/workspace/context"
 mkdir -p "$INSTALL_DIR/workspace/memory"
 mkdir -p "$INSTALL_DIR/skills"
 
-# Copy/Link .env if needed
-if [ ! -f "$INSTALL_DIR/.env" ]; then
-    if [ -f "./.env" ]; then
-        cp "./.env" "$INSTALL_DIR/.env"
-        echo -e "${GREEN}📝 Copied .env${NC}"
-    elif [ -f "./.env.example" ]; then
-        cp "./.env.example" "$INSTALL_DIR/.env"
-        echo -e "${YELLOW}📝 Created .env from template (needs editing)${NC}"
-    fi
-fi
-
 # Success
 VERSION=$(openspore --version 2>/dev/null || echo "unknown")
 echo ""
 echo -e "${GREEN}✅ Installed OpenSpore $VERSION!${NC}"
-echo "   Run 'openspore start'"
+echo ""
+echo -e "${YELLOW}⚠️  NEXT STEPS:${NC}"
+echo "   1. Create ~/.openspore/.env (Add OPENROUTER_API_KEY)"
+echo "   2. Configure Identity in ~/.openspore/workspace/identity/"
+echo "      - SOUL.md: Define your agent's character."
+echo "      - USER.md: Describe yourself for better context."
+echo "      - AGENTS.md: Define specific sub-agent roles for the Swarm to use when delegating tasks."
+echo "   3. Run 'openspore doctor' to verify"
+echo ""
+echo "   Once configured, run 'openspore start'"

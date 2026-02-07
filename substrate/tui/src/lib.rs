@@ -19,7 +19,15 @@ use app::App;
 
 pub async fn run() -> anyhow::Result<()> {
     // 1. Pre-flight Checks (Outside of Terminal Alternate Screen)
-    let config = openspore_core::config::AppConfig::load().expect("Failed to load AppConfig. Run 'openspore doctor' to check your .env file.");
+    let config = match openspore_core::config::AppConfig::load() {
+        Ok(cfg) => cfg,
+        Err(_) => {
+            eprintln!("❌ Error: Could not load configuration.");
+            eprintln!("   Please ensure ~/.openspore/.env exists and contains a valid OPENROUTER_API_KEY.");
+            eprintln!("   Run 'openspore doctor' for diagnostics.");
+            return Ok(());
+        }
+    };
 
     let mut doctor = openspore_doctor::SporeDoctor::new();
     doctor.check_all();
@@ -59,12 +67,14 @@ pub async fn run() -> anyhow::Result<()> {
     }
 
     // Start Autonomy Scheduler in background
-    let brain_clone = brain.clone_brain();
-    let memory_clone = memory.clone();
-    let tg_opt = openspore_telegram::TelegramChannel::new().ok();
-    tokio::spawn(async move {
-        openspore_autonomy::SporeScheduler::start(brain_clone, memory_clone, tg_opt).await;
-    });
+    if config.autonomy_enabled {
+        let brain_clone = brain.clone_brain();
+        let memory_clone = memory.clone();
+        let tg_opt = openspore_telegram::TelegramChannel::new().ok();
+        tokio::spawn(async move {
+            openspore_autonomy::SporeScheduler::start(brain_clone, memory_clone, tg_opt).await;
+        });
+    }
 
     let res = run_app(&mut terminal, &mut app, brain).await;
 
