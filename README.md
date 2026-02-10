@@ -1,8 +1,10 @@
 <div align="center">
+<img src="logo.svg" width="160" height="160" alt="OpenSpore Logo">
 
 # OpenSpore v1.1.3
 
 **The Autonomous AI Agent Ecosystem**
+
 *A minimalist Rust implementation of the OpenClaw architecture.*
 
 [![Rust](https://img.shields.io/badge/built_with-Rust-dca282.svg)](https://www.rust-lang.org/)
@@ -23,6 +25,10 @@
 **OpenSpore** is a high-performance, autonomous AI agent engine built in Rust. It serves as a **minimalist, simplified implementation of the OpenClaw architecture**, focusing on core autonomy, safety, and parallel tool execution without the overhead of larger frameworks.
 
 It is designed to be a "living" system that operates continuously, managing its own memory, executing complex multi-step tasks, and orchestrating a **parallel swarm of specialized sub-agents**. It features a rich Terminal User Interface (TUI) for observation, and a robust "Brain" that interfaces with powerful LLMs (Anthropic Claude, Google Gemini, OpenAI GPT) via **Parallel Tool Execution**.
+
+<div align="center">
+  <img src="Screenshot 2026-02-10 at 06.56.16.png" width="800" alt="OpenSpore TUI Preview">
+</div>
 
 This release, **v1.1.3**, signals the transition from individual autonomy to **Swarm Intelligence**. It introduces hierarchical task decomposition, a process-wide concurrency limit of 6 simultaneous spores, and a negotiation-based consensus loop for autonomous proposals.
 

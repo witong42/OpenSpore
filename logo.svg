@@ -1,0 +1,22 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="200" height="200" fill="none" />
+
+  <!-- Stem -->
+  <rect x="85" y="140" width="30" height="40" fill="#FFFFFF" rx="2" />
+
+  <!-- Cap Bottom -->
+  <path d="M40 140 Q 40 120 100 120 Q 160 120 160 140 Z" fill="#CC0000" />
+
+  <!-- Cap Top -->
+  <path d="M40 140 Q 40 40 100 40 Q 160 40 160 140" fill="#FF3333" />
+
+  <!-- Pixel/Circuit Accents -->
+  <rect x="70" y="70" width="10" height="10" fill="#FFCCCC" opacity="0.6" />
+  <rect x="120" y="85" width="8" height="8" fill="#FFCCCC" opacity="0.6" />
+  <rect x="95" y="60" width="12" height="12" fill="#FFCCCC" opacity="0.6" />
+
+  <!-- Neon Lines -->
+  <path d="M60 120 L 70 100 L 90 100" stroke="#FF9999" stroke-width="2" fill="none" />
+  <path d="M140 120 L 130 90 L 110 90" stroke="#FF9999" stroke-width="2" fill="none" />
+</svg>
