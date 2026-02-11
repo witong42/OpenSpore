@@ -21,6 +21,9 @@ pub struct AppConfig {
     #[serde(alias = "SAFE_MODE_ENABLED")]
     pub safe_mode_enabled: bool,
 
+    #[serde(alias = "BROWSER_TYPE")]
+    pub browser_type: Option<String>,
+
     #[serde(skip)]
     pub project_root: std::path::PathBuf,
 }

@@ -41,3 +41,13 @@ pub fn get_app_root() -> PathBuf {
         PathBuf::from(home).join(root_name)
     }
 }
+
+/// Ensures a path is absolute, resolving tilde and relative to app root.
+pub fn ensure_absolute(path: &str) -> PathBuf {
+    let p = get_path(path);
+    if p.is_absolute() {
+        p
+    } else {
+        get_app_root().join(p)
+    }
+}

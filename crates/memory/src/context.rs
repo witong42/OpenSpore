@@ -73,10 +73,28 @@ impl ContextManager {
             }
         }
 
+        // Filter recent items: if their key content is already in the summary, omit them
+        let summary_lower = summary.to_lowercase();
+        let filtered_recent: Vec<String> = recent_items.into_iter()
+            .map(|m| m.content)
+            .filter(|content| {
+                // Heuristic: if more than 50% of the words in a short exchange are in the summary, it's redundant
+                let words: Vec<&str> = content.split_whitespace().collect();
+                if words.is_empty() { return true; }
+
+                let matches = words.iter()
+                    .filter(|w| w.len() > 4 && summary_lower.contains(&w.to_lowercase()))
+                    .count();
+
+                let redundancy_ratio = matches as f32 / words.len() as f32;
+                redundancy_ratio < 0.6 // Keep if less than 60% redundant
+            })
+            .collect();
+
         Ok(WorkingContext {
             timestamp: chrono::Local::now(),
             summary,
-            recent: recent_items.iter().map(|m| m.content.clone()).collect::<Vec<_>>().join("\n\n"),
+            recent: filtered_recent.join("\n\n"),
             older_items,
         })
     }

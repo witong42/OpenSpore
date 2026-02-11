@@ -93,11 +93,19 @@ async fn main() {
     if let Some(cmd) = &args.command {
         match cmd {
             Commands::Stop => {
-                println!("🛑 Stopping all OpenSpore instances...");
-                let _ = Command::new("pkill")
-                    .args(["-f", "openspore"])
-                    .status();
-                println!("✅ All instances stopped.");
+                println!("🛑 Stopping all OpenSpore instances and browsers...");
+                let _ = Command::new("pkill").args(["-f", "openspore"]).status();
+                let _ = Command::new("pkill").args(["-f", "Google Chrome"]).status();
+                let _ = Command::new("pkill").args(["-f", "Chromium"]).status();
+                let _ = Command::new("pkill").args(["-f", "Brave Browser"]).status();
+
+                let app_dir = openspore_core::path_utils::get_app_root();
+                let session_file = app_dir.join("workspace").join("browser_sessions").join("active_session.json");
+                if session_file.exists() {
+                    let _ = std::fs::remove_file(session_file);
+                }
+
+                println!("✅ All instances and browsers stopped.");
                 return;
             }
             Commands::Doctor => {

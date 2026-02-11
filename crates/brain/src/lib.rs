@@ -49,8 +49,8 @@ impl Brain {
 
         Self {
             client: reqwest::Client::new(),
-            config,
-            skill_loader: Arc::new(SkillLoader::new()),
+            config: config.clone(),
+            skill_loader: Arc::new(SkillLoader::new(config)),
             memory,
             context_manager,
             io: Arc::new(openspore_io::get_bridge()),

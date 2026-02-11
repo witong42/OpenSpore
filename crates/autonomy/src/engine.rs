@@ -49,7 +49,7 @@ pub struct AutonomyEngine;
 
 impl AutonomyEngine {
     pub async fn run(brain: &Brain, memory: &MemorySystem) -> Result<Option<PathBuf>> {
-        info!("💡 Autonomy: Scanning for improvement opportunities (Tree of Thoughts mode)...");
+        info!("💡 Autonomy: Scanning for improvement opportunities (Chain of Thought mode)...");
 
         // 1. Load state
         let state_path = memory.project_root.join("workspace/autonomy/state.json");
@@ -84,15 +84,15 @@ impl AutonomyEngine {
         }
 
         // --- PHASE 1: BRAINSTORM (Branching) ---
-        info!("🌳 ToT [Phase 1]: Brainstorming multiple reasoning paths...");
+        info!("🌳 CoT [Phase 1]: Brainstorming multiple reasoning paths...");
         let brainstorm_prompt = format!(r#"
-You are the 'Explorer Spore'. Your job is to analyze the agent's recent logs and propose THREE (3) DIFFERENT reasoning paths (strategies) for system improvement.
+You are the 'Explorer Spore'. Your job is to analyze the agent's recent logs and propose THREE (3) DIFFERENT reasoning paths (strategies) for autonomous action.
 Context: You are running in the project root: {root}
 
 Unlike a single-threaded plan, you must explore different perspectives:
-Path A: Conservative/Safe refactoring.
-Path B: Feature expansion/New capability.
-Path C: Optimization/Performance refinement.
+Path A: Core Maintenance/System Improvement (Internal refactors, fixes, performance).
+Path B: Contextual Value/User Support (Researching topics mentioned in logs, proactive lookups, automating tasks).
+Path C: Strategic Exploration (Experimental features, new capabilities, scouting trends).
 
 Directive: Avoid over-engineering. If a problem can be fixed with 10 lines of code, do not propose a 4-task research-and-audit project.
 SYSTEM DIRECTIVE: You are in a reasoning phase. DO NOT USE ANY TOOLS. DO NOT add any conversational text. Respond ONLY with the JSON object below.
@@ -131,18 +131,18 @@ Output JSON ONLY:
         let brainstorm_json: serde_json::Value = match serde_json::from_str(Self::clean_json(&brainstorm_raw)) {
             Ok(j) => j,
             Err(e) => {
-                error!("ToT Error [Phase 1]: Failed to parse brainstorm JSON: {}. Raw: {}", e, brainstorm_raw);
+                error!("CoT Error [Phase 1]: Failed to parse brainstorm JSON: {}. Raw: {}", e, brainstorm_raw);
                 return Ok(None);
             }
         };
 
         if brainstorm_json["paths"].as_array().map_or(true, |a| a.is_empty()) {
-            error!("ToT Error [Phase 1]: No reasoning paths generated.");
+            error!("CoT Error [Phase 1]: No reasoning paths generated.");
             return Ok(None);
         }
 
         // --- PHASE 2: EVALUATE (Pruning/Selection) ---
-        info!("⚖️ ToT [Phase 2]: Evaluating paths and selecting winner...");
+        info!("⚖️ CoT [Phase 2]: Evaluating paths and selecting winner...");
         let referee_prompt = format!(r#"
 You are the 'Referee Spore'. Evaluate these 3 proposed reasoning paths.
 Select the WINNING path based on Safety, Value, and Feasibility.
@@ -164,7 +164,7 @@ Compare the paths, find the winner, and output JSON ONLY:
         let referee_json: serde_json::Value = match serde_json::from_str(Self::clean_json(&referee_raw)) {
             Ok(j) => j,
             Err(e) => {
-                error!("ToT Error [Phase 2]: Failed to parse referee JSON: {}. Raw: {}", e, referee_raw);
+                error!("CoT Error [Phase 2]: Failed to parse referee JSON: {}. Raw: {}", e, referee_raw);
                 return Ok(None);
             }
         };
@@ -174,13 +174,14 @@ Compare the paths, find the winner, and output JSON ONLY:
         let winning_path = paths.iter().find(|p| p["id"].as_u64().unwrap_or(0) as usize == winner_id)
             .unwrap_or(&paths[0]);
 
-        info!("🏆 ToT: Winner selected - Path {} ({})", winner_id, winning_path["strategy"]);
+        info!("🏆 CoT: Winner selected - Path {} ({})", winner_id, winning_path["strategy"]);
 
         // --- PHASE 3: FINALIZE (Action Planning) ---
-        info!("🗺️ ToT [Phase 3]: Generating Action Plan...");
+        info!("🗺️ CoT [Phase 3]: Generating Action Plan...");
         let planner_prompt = format!(r#"
 You are the 'Planner Spore'. Take the WINNING STRATEGY and generate a single, concrete 'Action Plan'.
 Directive: Be direct and technical. No multi-agent or hierarchical overhead.
+If the strategy is research-based, the plan should include specific topics to investigate using browser/read tools.
 SYSTEM DIRECTIVE: DO NOT USE TOOLS. Respond ONLY with the JSON object. Do not explain your choice.
 
 Winner: {strategy}
@@ -190,8 +191,8 @@ Output JSON ONLY:
 {{
     "title": "{title}",
     "description": "{description}",
-    "type": "feature",
-    "implementation_plan": "Step-by-step instructions for executing this change."
+    "type": "feature" | "research" | "action" | "maintenance",
+    "implementation_plan": "Step-by-step instructions for executing this change or investigation."
 }}
 "#,
             strategy = winning_path["strategy"],
@@ -204,13 +205,13 @@ Output JSON ONLY:
         let idea: Idea = match serde_json::from_str(Self::clean_json(&planner_raw)) {
             Ok(i) => i,
             Err(e) => {
-                error!("ToT Error [Phase 3]: Failed to parse planner JSON: {}. Raw: {}", e, planner_raw);
+                error!("CoT Error [Phase 3]: Failed to parse planner JSON: {}. Raw: {}", e, planner_raw);
                 return Ok(None);
             }
         };
 
         // --- PHASE 4: FINAL CONSENSUS (Audit) ---
-        info!("🔍 ToT [Phase 4]: Final Audit (Consensus Building)...");
+        info!("🔍 CoT [Phase 4]: Final Audit (Consensus Building)...");
         let review_prompt = format!(r#"
 You are the 'Reviewer Spore'. Audit this proposed Action Plan.
 Plan Title: {title}
@@ -230,15 +231,15 @@ Output JSON ONLY:
         let review_json: serde_json::Value = match serde_json::from_str(Self::clean_json(&review_raw)) {
             Ok(j) => j,
             Err(e) => {
-                error!("ToT Error [Phase 4]: Failed to parse reviewer JSON: {}. Raw: {}", e, review_raw);
+                error!("CoT Error [Phase 4]: Failed to parse reviewer JSON: {}. Raw: {}", e, review_raw);
                 return Ok(None);
             }
         };
 
         if review_json["status"] == "GREEN_LIGHT" {
-            info!("✅ ToT: Consensus reached. Proposal finalized.");
+            info!("✅ CoT: Consensus reached. Proposal finalized.");
         } else {
-            warn!("⚠️ ToT Rejected: {}", review_json["reason"]);
+            warn!("⚠️ CoT Rejected: {}", review_json["reason"]);
             return Ok(None);
         }
 
@@ -251,7 +252,7 @@ Output JSON ONLY:
 
         // 4. Create Proposal
         let proposal_path = Self::create_proposal(&idea, memory)?;
-        info!("✨ NEW PROPOSAL GENERATED (via ToT): {}", proposal_path.display());
+        info!("✨ NEW PROPOSAL GENERATED (via CoT): {}", proposal_path.display());
 
         Ok(Some(proposal_path))
     }

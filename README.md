@@ -1,7 +1,7 @@
 <div align="center">
 <img src="logo.svg" width="160" height="160" alt="OpenSpore Logo">
 
-# OpenSpore v1.1.3
+# OpenSpore v1.2.1
 
 **The Autonomous AI Agent Ecosystem**
 
@@ -9,7 +9,7 @@
 
 [![Rust](https://img.shields.io/badge/built_with-Rust-dca282.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.3-green.svg)]()
+[![Version](https://img.shields.io/badge/version-1.2.1-green.svg)]()
 
 *Architectural Sovereignty • System Integrity • Recursive Intelligence*
 
@@ -30,7 +30,7 @@ It is designed to be a "living" system that operates continuously, managing its 
   <img src="Screenshot 2026-02-10 at 06.56.16.png" width="800" alt="OpenSpore TUI Preview">
 </div>
 
-This release, **v1.1.3**, signals the transition from individual autonomy to **Swarm Intelligence**. It introduces hierarchical task decomposition, a process-wide concurrency limit of 6 simultaneous spores, and a negotiation-based consensus loop for autonomous proposals.
+This release, **v1.2.1**, signals the transition from individual autonomy to **Swarm Intelligence**. It introduces hierarchical task decomposition, a process-wide concurrency limit of 6 simultaneous spores, and a negotiation-based consensus loop for autonomous proposals.
 
 ## 🏗 Architecture
 
@@ -219,11 +219,23 @@ OpenSpore stores all its persistent data in `~/.openspore/workspace`.
 ## 🧠 Skills System
 
 Skills are the "tools" the agent can use. They are defined in the `skills/` directory.
-Each skill usually consists of a `SKILL.md` (definition) and associated scripts.
+
+### Types of Skills
+1. **Core Skills**: Fast, high-performance logic built directly into the Rust engine.
+2. **Plugin Skills**: Single-file scripts (`.js`, `.sh`, `.py`) located in `~/.openspore/skills/`.
+3. **AgentSkills (OpenClaw Compatible)**: Full directory-based skills following the OpenClaw standard.
+
+### 🦞 OpenClaw Compatibility
+OpenSpore v1.2.1+ officially supports the **AgentSkills** open standard. You can import skills from the OpenClaw ecosystem by dropping their folders into `~/.openspore/skills/`.
+
+Each AgentSkill directory must contain:
+- **`SKILL.md`**: A manifest with YAML frontmatter for metadata and instructions for the agent.
+- **Logic Script**: An entrypoint (e.g., `main.js`, `run.sh`, `handler.py`) either in the root or a `scripts/` folder.
 
 **To add a new skill:**
 1. Create a directory in `skills/my_new_skill`.
-2. The agent will automatically discover it.
+2. Add a `SKILL.md` file.
+3. The engine will automatically discover it on startup.
 
 ---
 

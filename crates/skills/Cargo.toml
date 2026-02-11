@@ -1,18 +1,25 @@
 [package]
 name = "openspore-skills"
-version = "1.1.3"
+version = "1.2.1"
 edition = "2024"
 
 [dependencies]
-tokio = { version = "1.49", features = ["full", "process"] }
-async-trait = "0.1"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-reqwest = { version = "0.12", features = ["json"] }
-anyhow = "1.0"
-tracing = "0.1"
-diffy = "0.4"
+tokio = { version = "1.49.0", features = ["full", "process"] }
+async-trait = "0.1.89"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+reqwest = { version = "0.12.28", features = ["json", "rustls-tls"] }
+anyhow = "1.0.101"
+tracing = "0.1.44"
+diffy = "0.4.2"
+chromiumoxide = { version = "0.8.0", features = ["tokio"] }
+futures-util = "0.3.31"
+tempfile = "3.25.0"
 openspore-core = { path = "../core" }
 openspore-memory = { path = "../memory" }
 openspore-swarm = { path = "../swarm" }
-chrono = "0.4"
+chrono = "0.4.43"
+dirs = "6.0.0"
+shellexpand = "3.1.1"
+which = "8.0.0"
+urlencoding = "2.1.3"

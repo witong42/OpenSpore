@@ -17,7 +17,11 @@ impl Skill for WebFetchSkill {
     async fn execute(&self, args: &str) -> Result<String, String> {
         let url = args.trim().trim_matches('"').trim_matches('\'');
 
-        let client = Client::new();
+        let client = Client::builder()
+            .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .build()
+            .unwrap_or_else(|_| Client::new());
+
         match client.get(url).send().await {
             Ok(response) => {
                 let status = response.status().as_u16();

@@ -15,7 +15,7 @@ impl Brain {
         let (system_prompt, session_ctx) = crate::context_assembler::ContextAssembler::build_system_prompt(self, user_prompt).await;
 
         let mut messages = vec![
-            Message { role: "system".to_string(), content: system_prompt },
+            Message { role: "system".to_string(), content: system_prompt.clone() },
             Message { role: "user".to_string(), content: user_prompt.to_string() }
         ];
 
@@ -29,7 +29,7 @@ impl Brain {
         };
 
         // 3. Tool Loop
-        let max_depth = 12;
+        let max_depth = 24;
         let mut depth = 0;
 
         loop {
@@ -87,13 +87,49 @@ impl Brain {
 
             // Execute Tools in Parallel
             use futures::stream::{FuturesUnordered, StreamExt};
-            let mut tool_tasks = FuturesUnordered::new();
+            use std::pin::Pin;
+            use futures::Future;
+
+            let mut tool_tasks: FuturesUnordered<Pin<Box<dyn Future<Output = (String, Result<String, String>)> + Send>>> = FuturesUnordered::new();
+
+            // State Verification: Track seen files in this turn's history
+            let history_so_far = messages.iter().map(|m| m.content.clone()).collect::<Vec<_>>().join("\n");
+            let destructive_tools = ["edit_file", "write_file", "diff_patch", "delegate"];
 
             for (name, arg) in tools_to_run {
+                // Autonomous Safety Guard: Check if file was read before modification
+                if destructive_tools.contains(&name.to_lowercase().as_str()) {
+                    let path_to_verify = if name == "delegate" {
+                        // For delegate, we just want to ensure it has SOME context, but it's less direct.
+                        // We'll skip path verification for delegate and focus on direct IR/WR.
+                        None
+                    } else {
+                        // Extract path from arg (might be JSON or raw path)
+                        if let Ok(json_arg) = serde_json::from_str::<serde_json::Value>(&arg) {
+                            json_arg.get("path").or_else(|| json_arg.get("TargetFile")).and_then(|v| v.as_str()).map(|s| s.to_string())
+                        } else {
+                            // Fallback for non-JSON skills
+                            Some(arg.clone())
+                        }
+                    };
+
+                    if let Some(path) = path_to_verify {
+                        let absolute_path = openspore_core::path_utils::ensure_absolute(&path).to_string_lossy().to_string();
+                        // Check if the file content is present in the history or summary
+                        if !history_so_far.contains(&absolute_path) && !system_prompt.contains(&absolute_path) {
+                             warn!("🛑 State Verification Failure: AI tried to modify {} without reading it first.", absolute_path);
+                             tool_tasks.push(Box::pin(async move {
+                                 (name, Err(format!("ERROR: State Verification Refused. You must use `READ_FILE` or `LIST_DIR` on '{}' to verify its current state before attempting to modify it. Blind writes are forbidden for safety.", absolute_path)))
+                             }));
+                             continue;
+                        }
+                    }
+                }
+
                 let skill_loader = &self.skill_loader;
                 let tx = tx.clone();
 
-                tool_tasks.push(async move {
+                tool_tasks.push(Box::pin(async move {
                     if let Some(skill) = skill_loader.get(&name) {
                         info!("⚙️ Executing: [{} : {}]", name, arg);
 
@@ -129,7 +165,7 @@ impl Brain {
                     } else {
                         (name.clone(), Err(format!("Unknown tool '{}'", name)))
                     }
-                });
+                }));
             }
 
             let mut tool_outputs = String::from("\n<TOOL_OUTPUTS>\n");
