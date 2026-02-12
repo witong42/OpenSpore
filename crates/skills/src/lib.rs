@@ -68,16 +68,27 @@ impl Skill for PluginSkill {
             .unwrap_or("");
 
         let sanitized_args = crate::utils::sanitize_path(args);
-        let script_path = self.script_path.to_string_lossy();
+        let script_path_str = self.script_path.to_string_lossy().to_string();
+        let cmd_args = crate::utils::split_arguments(&sanitized_args);
 
-        let full_command = match ext {
-            "js" => format!("node \"{}\" {}", script_path, sanitized_args),
-            "sh" => format!("sh \"{}\" {}", script_path, sanitized_args),
-            "py" => format!("python3 \"{}\" {}", script_path, sanitized_args),
-            _ => format!("\"{}\" {}", script_path, sanitized_args),
-        };
-
-        execute_command(&full_command).await
+        match ext {
+            "js" => {
+                let mut full_args = vec![script_path_str];
+                full_args.extend(cmd_args);
+                execute_process("node", &full_args).await
+            },
+            "sh" => {
+                let mut full_args = vec![script_path_str];
+                full_args.extend(cmd_args);
+                execute_process("sh", &full_args).await
+            },
+            "py" => {
+                let mut full_args = vec![script_path_str];
+                full_args.extend(cmd_args);
+                execute_process("python3", &full_args).await
+            },
+            _ => execute_process(&script_path_str, &cmd_args).await,
+        }
     }
 }
 
@@ -105,16 +116,27 @@ impl Skill for AgentSkill {
         if let Some(ref script_path) = self.script_path {
             let ext = script_path.extension().and_then(|e| e.to_str()).unwrap_or("");
             let sanitized_args = crate::utils::sanitize_path(args);
-            let path_str = script_path.to_string_lossy();
+            let path_str = script_path.to_string_lossy().to_string();
+            let cmd_args = crate::utils::split_arguments(&sanitized_args);
 
-            let full_command = match ext {
-                "js" => format!("node \"{}\" {}", path_str, sanitized_args),
-                "sh" => format!("sh \"{}\" {}", path_str, sanitized_args),
-                "py" => format!("python3 \"{}\" {}", path_str, sanitized_args),
-                _ => format!("\"{}\" {}", path_str, sanitized_args),
-            };
-
-            execute_command(&full_command).await
+            match ext {
+                "js" => {
+                    let mut full_args = vec![path_str];
+                    full_args.extend(cmd_args);
+                    execute_process("node", &full_args).await
+                },
+                "sh" => {
+                    let mut full_args = vec![path_str];
+                    full_args.extend(cmd_args);
+                    execute_process("sh", &full_args).await
+                },
+                "py" => {
+                    let mut full_args = vec![path_str];
+                    full_args.extend(cmd_args);
+                    execute_process("python3", &full_args).await
+                },
+                _ => execute_process(&path_str, &cmd_args).await,
+            }
         } else {
             let res = serde_json::json!({
                 "success": true,
@@ -126,8 +148,8 @@ impl Skill for AgentSkill {
     }
 }
 
-/// Helper to execute a shell command and return JSON result
-async fn execute_command(full_command: &str) -> Result<String, String> {
+/// Helper to execute a process and return JSON result
+async fn execute_process(program: &str, args: &[String]) -> Result<String, String> {
     let root = openspore_core::path_utils::get_app_root();
 
     // Ensure we have a decent PATH (same as ExecSkill)
@@ -135,9 +157,8 @@ async fn execute_command(full_command: &str) -> Result<String, String> {
     let path = std::env::var("PATH").unwrap_or_default();
     let new_path = format!("{}:{}", engine_bin.to_string_lossy(), path);
 
-    let output_res = Command::new("sh")
-        .arg("-c")
-        .arg(full_command)
+    let output_res = Command::new(program)
+        .args(args)
         .envs(std::env::vars())
         .env("PATH", new_path)
         .current_dir(&root)

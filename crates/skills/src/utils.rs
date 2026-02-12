@@ -86,3 +86,41 @@ pub fn is_path_protected(path_str: &str) -> bool {
 
     false
 }
+
+/// A simple shell-word splitter that respects quotes and escapes.
+pub fn split_arguments(s: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut word = String::new();
+    let mut in_quote = false;
+    let mut quote_char = '\0';
+    let mut escaped = false;
+
+    for c in s.chars() {
+        if escaped {
+            word.push(c);
+            escaped = false;
+        } else if c == '\\' {
+            escaped = true;
+        } else if in_quote {
+            if c == quote_char {
+                in_quote = false;
+            } else {
+                word.push(c);
+            }
+        } else if c == '"' || c == '\'' {
+            in_quote = true;
+            quote_char = c;
+        } else if c.is_whitespace() {
+            if !word.is_empty() {
+                words.push(word.clone());
+                word.clear();
+            }
+        } else {
+            word.push(c);
+        }
+    }
+    if !word.is_empty() {
+        words.push(word);
+    }
+    words
+}
