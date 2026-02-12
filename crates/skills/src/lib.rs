@@ -128,9 +128,19 @@ impl Skill for AgentSkill {
 
 /// Helper to execute a shell command and return JSON result
 async fn execute_command(full_command: &str) -> Result<String, String> {
+    let root = openspore_core::path_utils::get_app_root();
+
+    // Ensure we have a decent PATH (same as ExecSkill)
+    let engine_bin = root.join("crates/target/release");
+    let path = std::env::var("PATH").unwrap_or_default();
+    let new_path = format!("{}:{}", engine_bin.to_string_lossy(), path);
+
     let output_res = Command::new("sh")
         .arg("-c")
         .arg(full_command)
+        .envs(std::env::vars())
+        .env("PATH", new_path)
+        .current_dir(&root)
         .output()
         .await;
 

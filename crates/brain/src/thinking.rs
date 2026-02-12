@@ -99,27 +99,38 @@ impl Brain {
             for (name, arg) in tools_to_run {
                 // Autonomous Safety Guard: Check if file was read before modification
                 if destructive_tools.contains(&name.to_lowercase().as_str()) {
-                    let path_to_verify = if name == "delegate" {
+                    let path_to_verify = if name.to_lowercase() == "delegate" {
                         // For delegate, we just want to ensure it has SOME context, but it's less direct.
-                        // We'll skip path verification for delegate and focus on direct IR/WR.
                         None
                     } else {
-                        // Extract path from arg (might be JSON or raw path)
+                        // Extract path from arg (might be JSON or raw command string)
                         if let Ok(json_arg) = serde_json::from_str::<serde_json::Value>(&arg) {
-                            json_arg.get("path").or_else(|| json_arg.get("TargetFile")).and_then(|v| v.as_str()).map(|s| s.to_string())
+                            json_arg.get("path")
+                                .or_else(|| json_arg.get("TargetFile"))
+                                .or_else(|| json_arg.get("filename"))
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string())
                         } else {
-                            // Fallback for non-JSON skills
-                            Some(arg.clone())
+                            // Fallback for non-JSON skills (e.g., "path" --content="content")
+                            // We take the first part before any space or flag
+                            let path = arg.split_whitespace().next().unwrap_or("").trim_matches('"').to_string();
+                            if path.is_empty() { None } else { Some(path) }
                         }
                     };
 
                     if let Some(path) = path_to_verify {
                         let absolute_path = openspore_core::path_utils::ensure_absolute(&path).to_string_lossy().to_string();
-                        // Check if the file content is present in the history or summary
-                        if !history_so_far.contains(&absolute_path) && !system_prompt.contains(&absolute_path) {
+
+                        // SKIP VERIFICATION for internal system files that the AI is expected to manage
+                        // or that are already partially present in the system prompt context.
+                        let is_internal = absolute_path.ends_with("session_summary.md") ||
+                                         absolute_path.ends_with("LOGS.md") ||
+                                         absolute_path.contains("/workspace/context/");
+
+                        if !is_internal && !history_so_far.contains(&absolute_path) && !system_prompt.contains(&absolute_path) {
                              warn!("🛑 State Verification Failure: AI tried to modify {} without reading it first.", absolute_path);
                              tool_tasks.push(Box::pin(async move {
-                                 (name, Err(format!("ERROR: State Verification Refused. You must use `READ_FILE` or `LIST_DIR` on '{}' to verify its current state before attempting to modify it. Blind writes are forbidden for safety.", absolute_path)))
+                                 (name, Err(format!("ERROR: State Verification Refused. You must use `READ_FILE` or `LIST_DIR` on '{}' to verify its current state before attempting to modify it. Blind writes are forbidden for safety. (Tip: Use full absolute paths)", absolute_path)))
                              }));
                              continue;
                         }
