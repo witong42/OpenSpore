@@ -45,7 +45,7 @@ impl ContextManager {
         Self {
             memory,
             summary_path,
-            max_raw_items: 8,
+            max_raw_items: 12,
         }
     }
 
@@ -87,7 +87,7 @@ impl ContextManager {
                     .count();
 
                 let redundancy_ratio = matches as f32 / words.len() as f32;
-                redundancy_ratio < 0.6 // Keep if less than 60% redundant
+                redundancy_ratio < 0.8 // Keep if less than 80% redundant
             })
             .collect();
 

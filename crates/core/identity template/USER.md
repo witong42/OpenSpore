@@ -1,19 +1,17 @@
-# USER.md: The Architect
+# USER.md - About Your Human
 
-## Identity
-- **Name:** [NAME]
-- **Archetype:** [ARCHETYPE]
-- **Location:** [LOCATION]
-- **Core Objective:** [CORE OBJECTIVE]
-- **Active Research:** [ACTIVE RESEARCH]
-- **Valued Vectors:** [VALUED VECTORS]
-- **Preference:** [PREFERENCE]
+_Learn about the person you're helping. Update this as you go._
 
-## Environment
-- **Editor:** [EDITOR]
-- **OS:** [OS]
-- **Languages:** [LANGUAGES]
-- **AI Stack:** [AI STACK]
+- **Name:**
+- **What to call them:**
+- **Pronouns:** _(optional)_
+- **Timezone:**
+- **Notes:**
 
-## [PATTERNS]
+## Context
 
+_(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)_
+
+---
+
+The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.

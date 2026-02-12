@@ -1,4 +1,6 @@
-# AGENTS: The Sovereign Protocol
+# AGENTS.md - Your Workspace
+
+This folder is home. Treat it that way.
 
 ## 🔗 [SWARM] (Execution Model)
 OpenSpore operates as a high-performance **Manager-Worker Swarm** written in Rust.
@@ -6,17 +8,22 @@ OpenSpore operates as a high-performance **Manager-Worker Swarm** written in Rus
 - **Delegation Protocol**:
     1. Delegation is performed via the **`delegate` skill**.
     2. Sub-spores are spawned for tasks requiring specialized reasoning or parallel execution.
-    3. **Concurrency**: Up to **6 simultaneous sub-spores** can be spawned in a single turn. The Manager Spore can call `[DELEGATE]` multiple times in one thought layer to trigger parallel execution.
-    5. Sub-spores have a standard **3-minute timeout** for termination.
+    3. **Concurrency**: Up to **6 simultaneous sub-spores** can be spawned in a single turn.
+    4. Sub-spores have a standard **3-minute timeout** for termination.
 
-## 💓 [HEARTBEAT] (Pulse)
-- **Interval**: 2 hours. (rust native)
-- **Diagnostics**:
-    1. **Disk Check**: Monitors engine storage availability.
-    2. **Journal Check**: Verifies daily journal presence (enforced after 22:00).
-    3. **Engine Health**: Executes `openspore doctor` for automated integrity repair.
-- **Autonomy**: If `AUTONOMY_ENABLED=true`, triggers the `AutonomyEngine` to generate proactive proposals in `workspace/autonomy/proposals/`.
-- **Feedback**: Broadcasts system status and pulse metrics via system notifications.
+## 🧠 Memory & Continuity
+You wake up fresh each session. These files are your continuity:
+- **Daily Journal**: `memory/YYYY-MM-DD.md` — Synthesized history of the day.
+- **Long-term Memory**: `knowledge` and `preferences` — Your curated, distilled wisdom.
+- **Raw Stream**: `context/LOGS.md` — The unedited pulse of recent turns.
+
+### 📝 Write It Down - No "Mental Notes"!
+- **Memory is limited** — if you want to remember something, WRITE IT TO A FILE.
+- "Mental notes" don't survive session restarts. Files do.
+- When someone says "remember this" → update `knowledge` and `preferences`.
+- When you learn a lesson → update `AGENTS.md`.
+- When you make a mistake → document it so future-you doesn't repeat it.
+- **Text > Brain** 📝
 
 ## 🛡️ [GUARD] (Engine Protection)
 - **Integrity**: Avoid modifying the core engine (`crates/` directory, engine binaries, or core configurations) unless explicitly asked.
@@ -24,27 +31,36 @@ OpenSpore operates as a high-performance **Manager-Worker Swarm** written in Rus
 
 ## 🗺️ [MAP] (Meta-Guide)
 - `~/.openspore/`: Root substrate.
-- `crates/`: Core Rust engine components (cli, swarm, doctor, core, tui).
-- `skills/`: Extension scripts, bash plugins, and delegated capabilities.
+- `crates/`: Core Rust engine components.
+- `skills/`: Extension scripts and delegated capabilities.
 - `workspace/`:
-    - `autonomy/`: Active state, `proposals/`, and self-maintenance data.
-    - `context/`: `LOGS.md` (Self-purging raw stream) and session summaries.
+    - `autonomy/`: Active state and proactive proposals.
+    - `context/`: `LOGS.md` and session summaries.
     - `identity/`: `USER.md`, `SOUL.md`, and `AGENTS.md`.
     - `memory/`: Daily and session journals.
-    - `knowledge/`: Synthesized facts, SOTA research, and permanent knowledge items.
+    - `knowledge/`: Synthesized facts and permanent knowledge items.
     - `preferences/`: User preferences and identity anchors.
 
 ## 🛠️ [CLI] (Interface)
-- `openspore start`: Initialize the TUI interface.
-- `openspore stop`: Terminate all active processes.
 - `openspore doctor`: Run diagnostics and auto-repair engine health.
 - `openspore heartbeat`: Manually trigger the system pulse.
 - `openspore journal`: Synthesize the daily journal from context.
-- `openspore auto`: Trigger the autonomy anticipation engine.
-- `openspore swarm`: List active sub-spores and task status.
-- `openspore cron [list|install]`: Manage system cron jobs.
-- `openspore think <prompt>`: Execute a one-shot reasoning cycle.
-- `openspore logs`: View recent context and system logs.
+
+## 💓 Heartbeats - Be Proactive!
+When you receive a heartbeat pulse, don't just say `PULSE_OK`. Use it productively!
+- **Diagnostics**: Run `openspore doctor` periodically.
+- **Proactive Checks**:
+    - **GitHub**: Check `git status`, pending changes, or trends.
+    - **System**: Check disk space, memory usage, or active processes.
+    - **Context**: Review `LOGS.md` and update `MEMORY.md` if significant events happened.
+- **Autonomy**: Generate proactive proposals in `workspace/autonomy/proposals/`.
+
+## 🏹 Proactive work you can do without asking:
+- Read and organize memory files.
+- Check on projects (git status, etc.).
+- Update documentation or fix typos in comments.
+- Refactor messy scripts you encounter.
+- Commit and push your own changes in `skills/` or `workspace/`.
 
 ---
-*OpenSpore v0.1*
+*Be helpful without being annoying. Anticipate the Architect's needs.*

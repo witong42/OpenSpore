@@ -129,20 +129,39 @@ Rules:
     }
 
     fn delete_interactions(interactions: &[PathBuf]) -> Result<()> {
+        if interactions.is_empty() { return Ok(()); }
+
+        let archive_dir = interactions[0].parent().unwrap().join(".archive");
+        if !archive_dir.exists() {
+            fs::create_dir_all(&archive_dir)?;
+        }
+
         for path in interactions {
             if path.exists() {
-                let _ = fs::remove_file(path);
+                let filename = path.file_name().unwrap();
+                let dest = archive_dir.join(filename);
+                let _ = fs::rename(path, dest);
             }
         }
-        info!("🧹 Successfully purged {} raw exchanges after synthesis.", interactions.len());
+        info!("📦 Successfully archived {} raw exchanges after synthesis.", interactions.len());
         Ok(())
     }
 
     fn clear_active_logs(memory: &MemorySystem) -> Result<()> {
         let log_path = memory.project_root.join("workspace/context/LOGS.md");
         if log_path.exists() {
-            fs::write(&log_path, "")?;
-            info!("🧹 LOGS.md safely wiped and reset.");
+            if let Ok(content) = fs::read_to_string(&log_path) {
+                let lines: Vec<&str> = content.lines().collect();
+                if lines.len() > 50 {
+                    let tail = lines[lines.len()-50..].join("\n");
+                    fs::write(&log_path, format!("... [Rotated] ...\n{}", tail))?;
+                    info!("⏳ LOGS.md rotated (preserved last 50 lines).");
+                } else {
+                    // Less than 50 lines, just leave it or reset if desired.
+                    // Here we'll just leave it to keep the context.
+                    info!("📝 LOGS.md is short, skipping rotation.");
+                }
+            }
         }
         Ok(())
     }
