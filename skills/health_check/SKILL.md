@@ -1,7 +1,6 @@
 ---
-name: health_check
-description: Verifies OpenSpore engine and environment health.
+name: enhanced_health_check
+description: Enhanced health check skill with file system read/write and path validation.
 ---
 
-### Usage
-- `[HEALTH_CHECK]`
+This skill performs system health checks and validates file system read/write operations and path accessibility.

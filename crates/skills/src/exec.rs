@@ -24,7 +24,7 @@ impl Skill for ExecSkill {
         let current_cwd = crate::utils::get_virtual_cwd();
 
         // 2. Argument Parsing
-        let args_list = crate::utils::split_arguments(args);
+        let args_list = crate::utils::parse_smart_args(args);
         let raw_cmd = args_list.get(0).cloned().unwrap_or_default();
         let wait_for = args_list.get(1).cloned();
         let timeout_secs = args_list.get(2).and_then(|s| s.parse::<u64>().ok()).unwrap_or(30);
@@ -55,7 +55,11 @@ impl Skill for ExecSkill {
         // 4. Intelligent Binary & PATH setup
         let engine_bin = project_root.join("crates/target/release");
         let path = std::env::var("PATH").unwrap_or_default();
-        let new_path = format!("{}:{}", engine_bin.to_string_lossy(), path);
+
+        // Add common binary locations for reliability (especially for Bun/Homebrew on Mac)
+        let extra_paths = "/usr/local/bin:/opt/homebrew/bin:~/.bun/bin";
+        let expanded_extra = openspore_core::path_utils::expand_tilde(extra_paths);
+        let new_path = format!("{}:{}:{}", engine_bin.to_string_lossy(), expanded_extra, path);
 
         // 5. SAFE MODE CHECK
         if crate::utils::is_safe_mode_active() {

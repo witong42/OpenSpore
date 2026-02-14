@@ -14,6 +14,7 @@ use openspore_core::config::AppConfig;
 
 // Core skill modules (hardcoded in Rust)
 pub mod exec;
+pub mod grep;
 pub mod read_file;
 pub mod write_file;
 pub mod edit_file;
@@ -155,7 +156,11 @@ async fn execute_process(program: &str, args: &[String]) -> Result<String, Strin
     let current_cwd = crate::utils::get_virtual_cwd();
     let engine_bin = root.join("crates/target/release");
     let path = std::env::var("PATH").unwrap_or_default();
-    let new_path = format!("{}:{}", engine_bin.to_string_lossy(), path);
+
+    // Add common binary locations for reliability (especially for Bun/Homebrew on Mac)
+    let extra_paths = "/usr/local/bin:/opt/homebrew/bin:~/.bun/bin";
+    let expanded_extra = openspore_core::path_utils::expand_tilde(extra_paths);
+    let new_path = format!("{}:{}:{}", engine_bin.to_string_lossy(), expanded_extra, path);
 
     let output_res = Command::new(program)
         .args(args)
@@ -226,6 +231,7 @@ impl SkillLoader {
             Box::new(cron_manager::CronManagerSkill),
             Box::new(submit_skill::SubmitSkill),
             Box::new(browser::BrowserSkill::new(preferred_browser)),
+            Box::new(grep::GrepSkill),
         ];
 
         for skill in core_skills {
@@ -409,7 +415,7 @@ impl SkillLoader {
     pub fn reload_plugins(&mut self) {
         // Remove existing plugins (keep core skills)
         let core_names: Vec<String> = ["exec", "read_file", "write_file", "edit_file", "list_dir", "purge",
-                                        "web_fetch", "search", "delegate", "telegram_send", "diff_patch", "cron_manager", "submit_skill", "browser"]
+                                        "web_fetch", "search", "delegate", "telegram_send", "diff_patch", "cron_manager", "submit_skill", "browser", "grep"]
             .iter().map(|s| s.to_string()).collect();
 
         self.skills.retain(|name, _| core_names.contains(name));

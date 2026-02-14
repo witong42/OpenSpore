@@ -48,6 +48,12 @@ pub fn sanitize_path(raw: &str) -> String {
         return String::new();
     }
 
+    // 🕵️ Command Detection: If the string has spaces, it's likely a shell command, not a path.
+    // We only expand tildes in commands, we don't try to make them 'absolute' against CWD.
+    if trimmed.contains(' ') {
+        return openspore_core::path_utils::expand_tilde(trimmed);
+    }
+
     // 1. Handle Tilde Expansion
     let expanded = openspore_core::path_utils::expand_tilde(trimmed);
     let path = std::path::Path::new(&expanded);
@@ -99,7 +105,79 @@ pub fn is_path_protected(path_str: &str) -> bool {
     false
 }
 
+/// A smart argument parser that handles JSON, quoted lists, or raw strings.
+/// Useful for tools like [EXEC] that might receive:
+/// 1. "command"
+/// 2. "command", "pattern", "timeout"
+/// 3. {"cmd": "command", "wait": "pattern"}
+pub fn parse_smart_args(s: &str) -> Vec<String> {
+    let trimmed = s.trim();
+
+    // 1. Try JSON
+    if let Ok(Value::Array(arr)) = serde_json::from_str(trimmed) {
+        return arr.iter().map(|v| v.as_str().unwrap_or_default().to_string()).collect();
+    }
+    if let Ok(Value::Object(obj)) = serde_json::from_str(trimmed) {
+        if let Some(cmd) = obj.get("cmd").and_then(|v| v.as_str()) {
+             let mut res = vec![cmd.to_string()];
+             if let Some(wait) = obj.get("wait").and_then(|v| v.as_str()) {
+                 res.push(wait.to_string());
+             }
+             return res;
+        }
+    }
+
+    // 2. Split by comma if it looks like a list: "arg1", "arg2"
+    // We use a simple state machine to split by comma ONLY when outside quotes.
+    let mut words = Vec::new();
+    let mut word = String::new();
+    let mut in_quote = false;
+    let mut quote_char = '\0';
+    let mut escaped = false;
+
+    for c in trimmed.chars() {
+        if escaped {
+            word.push(c);
+            escaped = false;
+        } else if c == '\\' {
+            escaped = true;
+        } else if in_quote {
+            if c == quote_char {
+                in_quote = false;
+            } else {
+                word.push(c);
+            }
+        } else if c == '"' || c == '\'' {
+            in_quote = true;
+            quote_char = c;
+        } else if c == ',' {
+            if !word.is_empty() {
+                words.push(word.trim().to_string());
+                word.clear();
+            }
+        } else {
+            word.push(c);
+        }
+    }
+    if !word.is_empty() {
+        words.push(word.trim().to_string());
+    }
+
+    // If we only got one word and it was unquoted spaces, split it normally?
+    // No, for EXEC, if there's no comma, the whole thing is the command.
+    if words.len() == 1 {
+        // Fallback for raw [EXEC: bun dev] without quotes
+        let val = words[0].clone();
+        if !trimmed.starts_with('"') && !trimmed.starts_with('\'') && val.contains(' ') && !val.contains(',') {
+             // It's a single command string
+        }
+    }
+
+    words
+}
+
 /// A simple shell-word splitter that respects quotes and escapes.
+/// Used for splitting whitespace-separated arguments for scripts.
 pub fn split_arguments(s: &str) -> Vec<String> {
     let mut words = Vec::new();
     let mut word = String::new();
@@ -160,4 +238,10 @@ pub fn set_virtual_cwd(new_path: &std::path::Path) -> std::io::Result<()> {
     }
     let state_file = context_dir.join("cwd.state");
     std::fs::write(state_file, new_path.to_string_lossy().to_string())
+}
+
+/// Resets the session's virtual CWD to the engine root.
+pub fn reset_virtual_cwd() {
+    let root = openspore_core::path_utils::get_app_root();
+    let _ = set_virtual_cwd(&root);
 }

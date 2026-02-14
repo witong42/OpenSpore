@@ -7,13 +7,14 @@ impl Brain {
         let model = self.get_model();
         let api_key = std::env::var("OPENROUTER_API_KEY")?;
 
-        // Standard temp
-        let temp = 0.7;
+        // Lower temperature for deterministic code generation (0.7 was too creative/inconsistent)
+        let temp = 0.2;
 
         let body = serde_json::json!({
             "model": model,
             "messages": messages,
             "temperature": temp,
+            "max_tokens": 16384,
         });
 
         // Retry logic: 3 attempts with exponential backoff

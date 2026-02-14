@@ -16,5 +16,6 @@ openspore-swarm = { path = "../swarm" }
 openspore-autonomy = { path = "../autonomy" }
 openspore-memory = { path = "../memory" }
 openspore-telegram = { path = "../channels/telegram" }
+openspore-skills = { path = "../skills" }
 serde_json = "1.0.149"
 tracing-appender = "0.2.4"

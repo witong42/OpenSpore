@@ -59,6 +59,12 @@ fn get_app_dir() -> String {
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
+
+    // 🕵️ Persistence Fix: Reset Virtual CWD if this is a fresh main run (not a sub-spore)
+    if std::env::var("IS_SPORE").is_err() {
+        openspore_skills::utils::reset_virtual_cwd();
+    }
+
     let app_dir = get_app_dir();
     let log_file = format!("{}/openspore.log", app_dir);
 

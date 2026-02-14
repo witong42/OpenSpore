@@ -55,6 +55,15 @@ impl ContextAssembler {
             format!("<IDENTITY>\n{}\n</IDENTITY>", items)
         } else { "".to_string() };
 
+        // 3. Dynamic File System Awareness
+        let virtual_cwd = openspore_skills::utils::get_virtual_cwd();
+        let project_root_path = &brain.config.project_root;
+        let relative_cwd = virtual_cwd.strip_prefix(project_root_path).unwrap_or(&virtual_cwd);
+        let fs_tree = openspore_core::path_utils::get_directory_tree(&virtual_cwd, 2);
+
+        let fs_str = format!("<FILE_SYSTEM_PULSE>\nCURRENT_LOCATION: {} (Relative to Root: ./{})\nSTRUCTURE_AT_LOCATION (Depth 2):\n{}\n</FILE_SYSTEM_PULSE>",
+            virtual_cwd.display(), relative_cwd.display(), fs_tree);
+
         // Swarm Identity Overlays
         if std::env::var("IS_SPORE").is_ok() {
             let role = std::env::var("SPORE_ROLE").unwrap_or_else(|_| "Sub-Agent".to_string());
@@ -62,21 +71,21 @@ impl ContextAssembler {
             // Lean Spore Prompt
             let prompt = format!(r#"You are a specialized OpenSpore Sub-Agent.
 Role: {role}
-Root: {project_root}
-
 {knowledge_str}
 
 {skills}
 
 <PRIME_DIRECTIVE>
 1. **ROLE IDENTITY**: You are a specialized sub-agent performing the role of '{role}'.
-2. **VALIDATION PULSE**: Never assume file content or directory state based on history alone. Use `READ_FILE` or `LIST_DIR` to verify reality before editing or executing scripts.
+2. **VALIDATION PULSE**: Never assume file content or directory state based on history alone. Use the `<FILE_SYSTEM_PULSE>` below as your absolute ground truth. Use `READ_FILE` or `LIST_DIR` to verify reality before editing.
 3. **CHAIN-OF-THOUGHT**: Explain your reasoning *before* taking action.
 4. **NO RECURSION**: Do NOT use the [DELEGATE] tool.
 5. **FORMAT**: Use `[TOOL_NAME: arg]`. Final Answer MUST be **Natural Language (Markdown)**. Never respond with raw JSON.
 6. **SAFE MODE**: If `SAFE_MODE_ENABLED=true`, modifying `crates/` (engine) or root config is strictly forbidden. Modifying `skills/` and `workspace/` is permitted.
 7. **STOPPING CRITERIA**: If the task is finished in history, stop and report.
 </PRIME_DIRECTIVE>
+
+{fs_str}
 
 {recent_str}
 
@@ -101,13 +110,15 @@ Engine Root: {project_root}
 
 <PRIME_DIRECTIVE>
 1. **ACTION FIRST**: Explain your logic briefly *before* calling tools. Stay focused on the immediate task.
-2. **VALIDATION PULSE**: Never assume file content or directory state based on history alone. You MUST use `READ_FILE` or `LIST_DIR` to verify reality before editing or executing scripts you didn't create in the current turn.
+2. **VALIDATION PULSE**: Never assume file content or directory state based on history alone. Use the `<FILE_SYSTEM_PULSE>` below as your sovereign ground truth. You MUST use `READ_FILE` or `LIST_DIR` to verify reality before editing or executing scripts you didn't create in the current turn.
 3. **TOOL SYNTAX**: Use `[TOOL_NAME: arg]`. For JSON args: `[TOOL_NAME: {{"k": "v"}}]`. No markdown code blocks for tool calls.
 4. **PARALLELISM**: Use up to 6 simultaneous `[DELEGATE]` or tool calls in one turn for maximum efficiency.
 5. **SAFE MODE**: If `SAFE_MODE_ENABLED=true`, modifying `crates/` (engine) or root config is strictly forbidden. Modifying `skills/` and `workspace/` is permitted and encouraged.
 6. **RESPONSE FORMAT**: Use **Natural Language (Markdown)**. Never respond with a raw JSON object. Use code blocks ONLY for file content.
 7. **STOPPING CRITERIA**: If the task is clearly finished in the `<RECENT_HISTORY>`, do NOT re-run it. Provide a final summary and stop.
 </PRIME_DIRECTIVE>
+
+{fs_str}
 
 {summary_str}
 

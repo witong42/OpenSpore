@@ -40,6 +40,7 @@ impl SwarmManager {
             .arg(task)
             .arg("--role")
             .arg(role)
+            .env("IS_SPORE", "true")
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .spawn()?;

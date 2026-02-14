@@ -36,7 +36,7 @@ pub async fn run() -> anyhow::Result<()> {
     // 2. Setup TUI Terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, event::EnableMouseCapture)?;
+    execute!(stdout, EnterAlternateScreen, event::EnableMouseCapture, event::EnableBracketedPaste)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -83,7 +83,8 @@ pub async fn run() -> anyhow::Result<()> {
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
-        event::DisableMouseCapture
+        event::DisableMouseCapture,
+        event::DisableBracketedPaste
     )?;
     terminal.show_cursor()?;
 
@@ -187,6 +188,10 @@ async fn run_app<B: ratatui::backend::Backend + std::io::Write>(
                         }
                         _ => {}
                     }
+                }
+                Event::Paste(text) => {
+                    let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+                    app.input.push_str(&normalized);
                 }
                 _ => {}
             }

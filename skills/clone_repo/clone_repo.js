@@ -39,7 +39,15 @@ module.exports = async (args) => {
 
     // Ensure parent directory exists
     const parentDir = path.dirname(absolutePath);
-    await execAsync(`mkdir -p "${parentDir}"`);
+    const { withRetry } = require('../utils');
+    //Validate and Normalize path
+    const normalizedPath = path.normalize(absolutePath);
+    const isValidPath = normalizedPath.startsWith(appRoot);
+    if (!isValidPath) {
+      return JSON.stringify({ success: false, error: `Invalid clone path: ${normalizedPath}. Must be within ${appRoot}` });
+    }
+
+    await withRetry(() => execAsync(`mkdir -p "${parentDir}"`));
 
     // Execute Clone
     const { stdout, stderr } = await execAsync(`git clone "${repo_url}" "${absolutePath}"`);

@@ -53,3 +53,50 @@ pub fn ensure_absolute(path: &str) -> PathBuf {
         get_app_root().join(p)
     }
 }
+
+/// Generates a lightweight, depth-limited string representation of the directory tree.
+/// Skips hidden files, target/, and node_modules/ to keep the context slim.
+pub fn get_directory_tree(path: &std::path::Path, max_depth: usize) -> String {
+    let mut tree = String::new();
+    let _ = build_tree_string(path, 0, max_depth, &mut tree);
+    tree
+}
+
+fn build_tree_string(path: &std::path::Path, depth: usize, max_depth: usize, out: &mut String) -> std::io::Result<()> {
+    if depth > max_depth {
+        return Ok(());
+    }
+
+    let mut entries: Vec<_> = std::fs::read_dir(path)?
+        .flatten()
+        .collect();
+
+    // Sort for stable results
+    entries.sort_by_key(|e| e.file_name());
+
+    for entry in entries {
+        let name = entry.file_name().to_string_lossy().to_string();
+
+        // Skip junk
+        if name.starts_with('.') || name == "target" || name == "node_modules" || name == "dist" || name == "out" {
+            continue;
+        }
+
+        for _ in 0..depth {
+            out.push_str("  ");
+        }
+
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            out.push_str("📁 ");
+            out.push_str(&name);
+            out.push_str("/\n");
+            let _ = build_tree_string(&entry.path(), depth + 1, max_depth, out);
+        } else {
+            out.push_str("📄 ");
+            out.push_str(&name);
+            out.push_str("\n");
+        }
+    }
+    Ok(())
+}
