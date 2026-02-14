@@ -152,7 +152,7 @@ impl Skill for AgentSkill {
 async fn execute_process(program: &str, args: &[String]) -> Result<String, String> {
     let root = openspore_core::path_utils::get_app_root();
 
-    // Ensure we have a decent PATH (same as ExecSkill)
+    let current_cwd = crate::utils::get_virtual_cwd();
     let engine_bin = root.join("crates/target/release");
     let path = std::env::var("PATH").unwrap_or_default();
     let new_path = format!("{}:{}", engine_bin.to_string_lossy(), path);
@@ -161,7 +161,7 @@ async fn execute_process(program: &str, args: &[String]) -> Result<String, Strin
         .args(args)
         .envs(std::env::vars())
         .env("PATH", new_path)
-        .current_dir(&root)
+        .current_dir(&current_cwd)
         .output()
         .await;
 

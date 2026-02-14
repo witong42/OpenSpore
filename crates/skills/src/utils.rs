@@ -42,20 +42,22 @@ pub fn unescape(s: &str) -> String {
     result
 }
 
-/// Centralized path/string sanitization for all skills.
-/// Trims quotes, expands tildes, and removes unneccessary whitespace.
 pub fn sanitize_path(raw: &str) -> String {
     let trimmed = raw.trim().trim_matches('"').trim_matches('\'').trim();
     if trimmed.is_empty() {
         return String::new();
     }
 
-    // If it looks like a single path (no spaces and not a URL), make it absolute
-    if !trimmed.contains(' ') && !trimmed.contains("://") {
-        openspore_core::path_utils::ensure_absolute(trimmed).to_string_lossy().to_string()
+    // 1. Handle Tilde Expansion
+    let expanded = openspore_core::path_utils::expand_tilde(trimmed);
+    let path = std::path::Path::new(&expanded);
+
+    // 2. Resolve Relative Paths against Virtual CWD
+    if !trimmed.contains("://") && !path.is_absolute() {
+        let cwd = get_virtual_cwd();
+        cwd.join(path).to_string_lossy().to_string()
     } else {
-        // Otherwise just expand tilde (for git urls, multi-arg strings, etc)
-        openspore_core::path_utils::expand_tilde(trimmed)
+        expanded
     }
 }
 
@@ -133,4 +135,29 @@ pub fn split_arguments(s: &str) -> Vec<String> {
         words.push(word);
     }
     words
+}
+
+/// Retrieves the session's virtual CWD. Default is engine root.
+pub fn get_virtual_cwd() -> std::path::PathBuf {
+    let root = openspore_core::path_utils::get_app_root();
+    let state_file = root.join("workspace/context/cwd.state");
+
+    if let Ok(content) = std::fs::read_to_string(state_file) {
+        let p = std::path::PathBuf::from(content.trim());
+        if p.exists() && p.is_dir() {
+            return p;
+        }
+    }
+    root
+}
+
+/// Updates the session's virtual CWD.
+pub fn set_virtual_cwd(new_path: &std::path::Path) -> std::io::Result<()> {
+    let root = openspore_core::path_utils::get_app_root();
+    let context_dir = root.join("workspace/context");
+    if !context_dir.exists() {
+        let _ = std::fs::create_dir_all(&context_dir);
+    }
+    let state_file = context_dir.join("cwd.state");
+    std::fs::write(state_file, new_path.to_string_lossy().to_string())
 }
