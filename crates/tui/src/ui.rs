@@ -45,7 +45,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let header_block = ratatui::widgets::Block::default()
         .borders(ratatui::widgets::Borders::ALL)
         .border_type(ratatui::widgets::BorderType::Rounded)
-        .title("───────────────────── OpenSpore v1.2.1 ──────────────────────")
+        .title("───────────────────── OpenSpore v1.2.2 ──────────────────────")
         .border_style(Style::default().fg(Color::DarkGray));
 
     let inner_header = header_block.inner(chunks[0]);

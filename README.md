@@ -1,7 +1,7 @@
 <div align="center">
 <img src="logo.svg" width="160" height="160" alt="OpenSpore Logo">
 
-# OpenSpore v1.2.1
+# OpenSpore v1.2.2
 
 **The Autonomous AI Agent Ecosystem**
 
@@ -9,7 +9,7 @@
 
 [![Rust](https://img.shields.io/badge/built_with-Rust-dca282.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2.1-green.svg)]()
+[![Version](https://img.shields.io/badge/version-1.2.2-green.svg)]()
 
 *Architectural Sovereignty • System Integrity • Recursive Intelligence*
 
@@ -246,7 +246,7 @@ Skills are the "tools" the agent can use. They are defined in the `skills/` dire
 3. **AgentSkills (OpenClaw Compatible)**: Full directory-based skills following the OpenClaw standard.
 
 ### 🦞 OpenClaw Compatibility
-OpenSpore v1.2.1+ officially supports the **AgentSkills** open standard. You can import skills from the OpenClaw ecosystem by dropping their folders into `~/.openspore/skills/`.
+OpenSpore v1.2.2+ officially supports the **AgentSkills** open standard. You can import skills from the OpenClaw ecosystem by dropping their folders into `~/.openspore/skills/`.
 
 Each AgentSkill directory must contain:
 - **`SKILL.md`**: A manifest with YAML frontmatter for metadata and instructions for the agent.

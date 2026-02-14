@@ -46,7 +46,17 @@ pub fn unescape(s: &str) -> String {
 /// Trims quotes, expands tildes, and removes unneccessary whitespace.
 pub fn sanitize_path(raw: &str) -> String {
     let trimmed = raw.trim().trim_matches('"').trim_matches('\'').trim();
-    openspore_core::path_utils::expand_tilde(trimmed)
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    // If it looks like a single path (no spaces and not a URL), make it absolute
+    if !trimmed.contains(' ') && !trimmed.contains("://") {
+        openspore_core::path_utils::ensure_absolute(trimmed).to_string_lossy().to_string()
+    } else {
+        // Otherwise just expand tilde (for git urls, multi-arg strings, etc)
+        openspore_core::path_utils::expand_tilde(trimmed)
+    }
 }
 
 /// Check if global safe mode is enabled via environment variable

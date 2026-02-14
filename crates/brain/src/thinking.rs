@@ -111,9 +111,9 @@ impl Brain {
                                 .and_then(|v| v.as_str())
                                 .map(|s| s.to_string())
                         } else {
-                            // Fallback for non-JSON skills (e.g., "path" --content="content")
-                            // We take the first part before any space or flag
-                            let path = arg.split_whitespace().next().unwrap_or("").trim_matches('"').to_string();
+                            // Fallback: take the first argument (could be quoted)
+                            let args = crate::parser::ToolParser::split_arguments(&arg);
+                            let path = args.get(0).cloned().unwrap_or_default();
                             if path.is_empty() { None } else { Some(path) }
                         }
                     };
@@ -127,7 +127,7 @@ impl Brain {
                                          absolute_path.ends_with("LOGS.md") ||
                                          absolute_path.contains("/workspace/context/");
 
-                        if !is_internal && !history_so_far.contains(&absolute_path) && !system_prompt.contains(&absolute_path) {
+                        if !is_internal && !history_so_far.contains(&absolute_path) && !system_prompt.contains(&absolute_path) && !history_so_far.contains(&path) && !system_prompt.contains(&path) {
                              warn!("🛑 State Verification Failure: AI tried to modify {} without reading it first.", absolute_path);
                              tool_tasks.push(Box::pin(async move {
                                  (name, Err(format!("ERROR: State Verification Refused. You must use `READ_FILE` or `LIST_DIR` on '{}' to verify its current state before attempting to modify it. Blind writes are forbidden for safety. (Tip: Use full absolute paths)", absolute_path)))
