@@ -10,16 +10,18 @@ use std::path::PathBuf;
 /// "~/archive" -> "/Users/william/archive"
 /// "/tmp/foo" -> "/tmp/foo" (no change)
 pub fn expand_tilde(path: &str) -> String {
-    if path == "~" {
-        return std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    if !path.contains('~') {
+        return path.to_string();
     }
 
-    if path.starts_with("~/") {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        return path.replacen('~', &home, 1);
-    }
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
 
-    path.to_string()
+    // Replace ~/ at start or after a space
+    let mut result = path.to_string();
+    if result.starts_with("~/") {
+        result = result.replacen("~/", &format!("{}/", home), 1);
+    }
+    result.replace(" ~/", &format!(" {}/", home))
 }
 
 /// Helper to convert a potentially tilde-containing string into a PathBuf.

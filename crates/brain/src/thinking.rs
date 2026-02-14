@@ -94,7 +94,7 @@ impl Brain {
 
             // State Verification: Track seen files in this turn's history
             let history_so_far = messages.iter().map(|m| m.content.clone()).collect::<Vec<_>>().join("\n");
-            let destructive_tools = ["edit_file", "write_file", "diff_patch", "delegate"];
+            let destructive_tools = ["edit_file", "write_file", "diff_patch", "delegate", "exec"];
 
             for (name, arg) in tools_to_run {
                 // Autonomous Safety Guard: Check if file was read before modification
@@ -102,6 +102,16 @@ impl Brain {
                     let path_to_verify = if name.to_lowercase() == "delegate" {
                         // For delegate, we just want to ensure it has SOME context, but it's less direct.
                         None
+                    } else if name.to_lowercase() == "exec" {
+                        // For exec, check if it's a destructive command and extract path
+                        let lower_arg = arg.to_lowercase();
+                        if lower_arg.contains("rm ") || lower_arg.contains("mv ") || lower_arg.contains("sed ") {
+                             let args = crate::parser::ToolParser::split_arguments(&arg);
+                             // Usually the last or second to last arg is the path
+                             args.last().cloned()
+                        } else {
+                            None
+                        }
                     } else {
                         // Extract path from arg (might be JSON or raw command string)
                         if let Ok(json_arg) = serde_json::from_str::<serde_json::Value>(&arg) {
@@ -121,16 +131,19 @@ impl Brain {
                     if let Some(path) = path_to_verify {
                         let absolute_path = openspore_core::path_utils::ensure_absolute(&path).to_string_lossy().to_string();
 
-                        // SKIP VERIFICATION for internal system files that the AI is expected to manage
-                        // or that are already partially present in the system prompt context.
+                        // SKIP VERIFICATION for internal system files or NEW directories being created
                         let is_internal = absolute_path.ends_with("session_summary.md") ||
                                          absolute_path.ends_with("LOGS.md") ||
                                          absolute_path.contains("/workspace/context/");
 
-                        if !is_internal && !history_so_far.contains(&absolute_path) && !system_prompt.contains(&absolute_path) && !history_so_far.contains(&path) && !system_prompt.contains(&path) {
-                             warn!("🛑 State Verification Failure: AI tried to modify {} without reading it first.", absolute_path);
+                        // If the command is a deletion, it MUST be verified.
+                        // If it's a write, we check if it already exists.
+                        let file_exists = std::path::Path::new(&absolute_path).exists();
+
+                        if !is_internal && file_exists && !history_so_far.contains(&absolute_path) && !system_prompt.contains(&absolute_path) && !history_so_far.contains(&path) && !system_prompt.contains(&path) {
+                             warn!("🛑 State Verification Failure: AI tried to modify/delete {} without reading it first.", absolute_path);
                              tool_tasks.push(Box::pin(async move {
-                                 (name, Err(format!("ERROR: State Verification Refused. You must use `READ_FILE` or `LIST_DIR` on '{}' to verify its current state before attempting to modify it. Blind writes are forbidden for safety. (Tip: Use full absolute paths)", absolute_path)))
+                                 (name, Err(format!("ERROR: State Verification Refused. You must use `READ_FILE` or `LIST_DIR` on '{}' to verify its current state before attempting to modify or delete it. Blind writes/deletes are forbidden for safety.", absolute_path)))
                              }));
                              continue;
                         }
